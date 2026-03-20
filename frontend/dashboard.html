@@ -9,7 +9,7 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    :root {
+    /* :root {
       --black:       #080b08;
       --green-deep:  #0b1f0d;
       --green-dark:  #0f2411;
@@ -26,7 +26,26 @@
       --sidebar-w:   220px;
       --error:       #c0392b;
       --warn:        #b8941a;
-    }
+    } */
+
+    :root {
+  --black:       #080b06;
+  --green-deep:  #1c1500;
+  --green-dark:  #2a1f00;
+  --green-mid:   #4a3800;
+  --green-vivid: #c9962e;
+  --green-glow:  #e8b040;
+  --green-pale:  #f5dc9a;
+  --white:       #f5f0e0;
+  --muted:       #8a7850;
+  --border:      rgba(200,160,50,0.18);
+  --border-h:    rgba(200,160,50,0.38);
+  --card-bg:     rgba(28,21,0,0.72);
+  --input-bg:    rgba(44,32,0,0.45);
+  --sidebar-w:   220px;
+  --error:       #c0392b;
+  --warn:        #b8941a;
+}
 
     html, body { height: 100%; background: var(--black); color: var(--white); font-family: 'DM Mono', monospace; overflow: hidden; }
 
@@ -495,7 +514,7 @@
     </div>
     <nav class="sidebar-nav">
       <div class="nav-label">Workspace</div>
-      <a href="#" class="nav-item active">
+      <a href="dashboard.html" class="nav-item active">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
         Investments
       </a>
@@ -503,15 +522,12 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         Partners
       </a>
-      <a href="#" class="nav-item">
+      <a href="ledger.html" class="nav-item">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         Ledger
       </a>
       <div class="nav-label">Account</div>
-      <a href="#" class="nav-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
-        Settings
-      </a>
+     
       <a href="auth.html" class="nav-item">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         Sign Out
@@ -666,48 +682,85 @@
 <!-- toast -->
 <div class="toast" id="toast"></div>
 
+<script src="api.js"></script>
 <script>
-  // ── STATE ──
-  let investments = [];
+  // ── STATE ──────────────────────────────────────────────────────────────────
+  let investments = [];      // normalised local cache [{id,name,cat,date,total,received,partners}]
   let partnerIdCounter = 0;
+  let formOpen = true;
 
-  // ── INIT ──
-  document.addEventListener('DOMContentLoaded', () => {
-    // set today's date
+  // ── NORMALISE API → local format ───────────────────────────────────────────
+  function normalise(inv) {
+    return {
+      id:       inv.id,
+      name:     inv.name,
+      cat:      inv.category,
+      date:     inv.deal_date ? inv.deal_date.split('T')[0] : '',
+      total:    parseFloat(inv.total_amount)    || 0,
+      received: parseFloat(inv.received_amount) || 0,
+      partners: (inv.partners || []).map(p => ({
+        name: p.partner_name,
+        pct:  parseFloat(p.percentage) || 0,
+      })),
+    };
+  }
+
+  // ── INIT ───────────────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', async () => {
+    if (!authGuard()) return;
     document.getElementById('inv-date').value = new Date().toISOString().split('T')[0];
-    // position toggle tab
     document.getElementById('panel-toggle').style.left = '360px';
-    // start with 2 partner rows
     addPartnerRow('You', 50);
     addPartnerRow('', 50);
     updateAlloc();
-    updateStats();
+    await loadInvestments();
 
-    // load from localStorage if available
-    try {
-      const saved = localStorage.getItem('verdant_investments');
-      if (saved) {
-        investments = JSON.parse(saved);
-        renderAll();
-      }
-    } catch(e) {}
+    // Sign out link
+    document.querySelector('a[href="auth.html"]').addEventListener('click', async e => {
+      e.preventDefault();
+      const refresh = Auth.getRefresh();
+      if (refresh) await api.post('/auth/logout', { refresh_token: refresh }).catch(() => {});
+      Auth.clear();
+      window.location.href = 'auth.html';
+    });
   });
 
-  function saveToStorage() {
-    try { localStorage.setItem('verdant_investments', JSON.stringify(investments)); } catch(e) {}
+  // ── LOAD FROM API ──────────────────────────────────────────────────────────
+  async function loadInvestments() {
+    try {
+      const res  = await api.get('/investments');
+      const data = await api.json(res);
+      // The list endpoint returns InvestmentListItem (no `partners` breakdown).
+      // Fetch full investment objects per-id so the UI can render partner rows.
+      const full = await Promise.all(
+        data.map(async (inv) => {
+          try {
+            const detRes = await api.get(`/investments/${inv.id}`);
+            return await api.json(detRes);
+          } catch (_) {
+            // Fallback to the list item (partners will be empty).
+            return inv;
+          }
+        })
+      );
+      investments = full.map(normalise);
+      renderAll();
+    } catch (e) {
+      showToast('Failed to load investments: ' + e.message, 'error');
+    }
   }
 
-  // ── PARTNER ROWS ──
+  // ── PARTNER ROWS (form UI — unchanged) ────────────────────────────────────
   function addPartnerRow(name = '', pct = '') {
     const list = document.getElementById('partners-list');
-    const id = ++partnerIdCounter;
-    const div = document.createElement('div');
+    const id   = ++partnerIdCounter;
+    const div  = document.createElement('div');
     div.className = 'partner-row-item';
     div.id = 'pr-' + id;
     div.innerHTML = `
       <input type="text" placeholder="Partner name" value="${name}" oninput="updateAlloc()"/>
       <div class="pct-wrap">
-        <input type="number" placeholder="%" min="0" max="100" value="${pct}" oninput="updateAlloc(); recalcPartners()"/>
+        <input type="number" placeholder="%" min="0" max="100" value="${pct}" oninput="updateAlloc()"/>
         <span class="pct-sym">%</span>
       </div>
       <button class="remove-partner" onclick="removePartner(${id})" title="Remove">×</button>
@@ -717,116 +770,144 @@
   }
 
   function removePartner(id) {
-    const el = document.getElementById('pr-' + id);
-    if (el) el.remove();
+    document.getElementById('pr-' + id)?.remove();
     updateAlloc();
   }
 
   function updateAlloc() {
-    const rows = document.querySelectorAll('#partners-list .partner-row-item');
-    let total = 0;
-    rows.forEach(r => {
-      const v = parseFloat(r.querySelector('input[type=number]').value) || 0;
-      total += v;
-    });
-    const pct = Math.min(total, 100);
-    const fill = document.getElementById('alloc-fill');
+    const rows  = document.querySelectorAll('#partners-list .partner-row-item');
+    let total   = 0;
+    rows.forEach(r => { total += parseFloat(r.querySelector('input[type=number]').value) || 0; });
+    const fill  = document.getElementById('alloc-fill');
     const label = document.getElementById('alloc-pct');
-    fill.style.width = pct + '%';
+    fill.style.width      = Math.min(total, 100) + '%';
     fill.style.background = total > 100 ? 'var(--error)' : total === 100 ? 'var(--green-glow)' : 'var(--green-vivid)';
-    label.textContent = total + '%';
-    label.className = 'alloc-pct' + (total > 100 ? ' over' : '');
+    label.textContent     = total + '%';
+    label.className       = 'alloc-pct' + (total > 100 ? ' over' : '');
   }
 
-  function recalcPartners() { /* live update handled on render */ }
-
-  // ── SAVE INVESTMENT ──
-  function saveInvestment() {
-    const name = document.getElementById('inv-name').value.trim();
-    const total = parseFloat(document.getElementById('inv-total').value) || 0;
+  // ── SAVE INVESTMENT → POST /investments ────────────────────────────────────
+  async function saveInvestment() {
+    const name     = document.getElementById('inv-name').value.trim();
+    const total    = parseFloat(document.getElementById('inv-total').value) || 0;
     const received = parseFloat(document.getElementById('inv-received').value) || 0;
-    const cat = document.getElementById('inv-cat').value;
-    const date = document.getElementById('inv-date').value;
-    const errEl = document.getElementById('form-error');
+    const cat      = document.getElementById('inv-cat').value;
+    const date     = document.getElementById('inv-date').value;
+    const errEl    = document.getElementById('form-error');
+    const btn      = document.querySelector('.submit-btn');
 
-    // collect partners
-    const rows = document.querySelectorAll('#partners-list .partner-row-item');
+    const rows     = document.querySelectorAll('#partners-list .partner-row-item');
     const partners = [];
     rows.forEach(r => {
       const n = r.querySelector('input[type=text]').value.trim();
       const p = parseFloat(r.querySelector('input[type=number]').value) || 0;
-      if (n) partners.push({ name: n, pct: p });
+      if (n) partners.push({ partner_name: n, percentage: p });
     });
 
-    const totalPct = partners.reduce((a, b) => a + b.pct, 0);
+    const totalPct = partners.reduce((a, b) => a + b.percentage, 0);
 
-    // validate
-    let errors = [];
-    if (!name) errors.push('Investment name required.');
-    if (total <= 0) errors.push('Total investment must be > 0.');
-    if (partners.length === 0) errors.push('Add at least one partner.');
-    if (Math.abs(totalPct - 100) > 0.01) errors.push(`Partner percentages must total 100% (currently ${totalPct}%).`);
+    let error = '';
+    if (!name)                             error = 'Investment name required.';
+    else if (total <= 0)                   error = 'Total investment must be > 0.';
+    else if (partners.length === 0)        error = 'Add at least one partner.';
+    else if (Math.abs(totalPct - 100) > 0.01) error = `Partner percentages must total 100% (currently ${totalPct}%).`;
 
-    if (errors.length) {
-      errEl.textContent = errors[0];
-      errEl.classList.add('show');
-      return;
-    }
+    if (error) { errEl.textContent = error; errEl.classList.add('show'); return; }
     errEl.classList.remove('show');
 
-    const inv = {
-      id: Date.now(),
-      name, total, received, cat, date,
-      partners,
-      createdAt: new Date().toISOString()
-    };
-
-    investments.unshift(inv);
-    saveToStorage();
-    renderAll();
-    showToast('Investment saved successfully');
-
-    // reset form
-    document.getElementById('inv-name').value = '';
-    document.getElementById('inv-total').value = '';
-    document.getElementById('inv-received').value = '';
-    document.getElementById('partners-list').innerHTML = '';
-    partnerIdCounter = 0;
-    addPartnerRow('You', 50);
-    addPartnerRow('', 50);
-    updateAlloc();
+    setBtnLoading(btn, true);
+    try {
+      const body = {
+        name,
+        category:        cat,
+        deal_date:       date ? date + 'T00:00:00' : null,
+        total_amount:    total,
+        received_amount: received,
+        partners,
+      };
+      const res  = await api.post('/investments', body);
+      const data = await api.json(res);
+      investments.unshift(normalise(data));
+      renderAll();
+      showToast('Investment saved');
+      // reset form
+      document.getElementById('inv-name').value     = '';
+      document.getElementById('inv-total').value    = '';
+      document.getElementById('inv-received').value = '';
+      document.getElementById('partners-list').innerHTML = '';
+      partnerIdCounter = 0;
+      addPartnerRow('You', 50);
+      addPartnerRow('', 50);
+      updateAlloc();
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.classList.add('show');
+    } finally {
+      setBtnLoading(btn, false, 'Save Investment →');
+    }
   }
 
-  // ── RENDER ──
-  function renderAll() {
-    renderInvestments();
-    updateStats();
+  // ── SAVE RECEIVED → PATCH /investments/{id}/received ──────────────────────
+  async function saveReceived(id) {
+    const input = document.getElementById('recv-input-' + id);
+    const val   = parseFloat(input.value) || 0;
+    try {
+      const res  = await api.patch(`/investments/${id}/received`, { received_amount: val });
+      const data = await api.json(res);
+      const idx  = investments.findIndex(i => i.id === id);
+      if (idx > -1) investments[idx] = normalise(data);
+      renderAll();
+      showToast('Returns updated');
+    } catch (e) {
+      showToast('Error: ' + e.message, 'error');
+    }
   }
+
+  // ── DELETE → DELETE /investments/{id} ─────────────────────────────────────
+  async function deleteInvestment(id) {
+    if (!confirm('Delete this investment? This cannot be undone.')) return;
+    try {
+      await api.json(await api.del(`/investments/${id}`));
+      investments = investments.filter(i => i.id !== id);
+      renderAll();
+      showToast('Investment deleted');
+    } catch (e) {
+      showToast('Error: ' + e.message, 'error');
+    }
+  }
+
+  function toggleEditReceived(id) {
+    document.getElementById('recv-edit-' + id).classList.toggle('show');
+  }
+
+  // ── RENDER (unchanged logic, same DOM) ────────────────────────────────────
+  function renderAll() { renderInvestments(); updateStats(); }
 
   function renderInvestments() {
-    const grid = document.getElementById('investments-grid');
-    const emptyState = document.getElementById('empty-state');
+    const grid  = document.getElementById('investments-grid');
     const badge = document.getElementById('inv-count-badge');
-
     badge.textContent = investments.length + (investments.length === 1 ? ' deal' : ' deals');
 
     if (investments.length === 0) {
-      grid.innerHTML = '';
-      grid.appendChild(emptyState || makeEmptyState());
+      grid.innerHTML = `
+        <div class="empty-state" id="empty-state">
+          <div class="empty-state-icon">◈</div>
+          <div class="empty-state-title">No investments yet</div>
+          <div class="empty-state-sub">Add your first deal using the form on the left.<br>Set partners, percentages, and track distributions.</div>
+        </div>`;
       return;
     }
 
     grid.innerHTML = '';
-
     investments.forEach((inv, idx) => {
       const card = document.createElement('div');
       card.className = 'inv-card';
       card.style.animationDelay = (idx * 0.05) + 's';
       card.id = 'inv-card-' + inv.id;
 
-      const status = inv.received > 0 ? 'funded' : 'pending';
+      const status      = inv.received > 0 ? 'funded' : 'pending';
       const statusLabel = inv.received > 0 ? 'Returns received' : 'Pending returns';
-      const catLabel = { 'real-estate':'Real Estate', 'stocks':'Stocks', 'business':'Business', 'commodities':'Commodities', 'other':'Other' }[inv.cat] || inv.cat;
+      const catLabel    = { 'real-estate':'Real Estate','stocks':'Stocks','business':'Business','commodities':'Commodities','other':'Other' }[inv.cat] || inv.cat;
 
       const partnersHTML = inv.partners.map(p => {
         const invested = (p.pct / 100) * inv.total;
@@ -848,9 +929,7 @@
           <div>
             <div class="inv-name">${inv.name}</div>
             <div class="inv-meta">${catLabel} · ${formatDate(inv.date)}</div>
-            <div style="margin-top:8px">
-              <span class="status-badge ${status}">${statusLabel}</span>
-            </div>
+            <div style="margin-top:8px"><span class="status-badge ${status}">${statusLabel}</span></div>
           </div>
           <div class="inv-amounts">
             <div class="inv-total-label">Total Invested</div>
@@ -872,98 +951,49 @@
         <div class="inv-partners">
           <div class="partners-head">
             <span>Partner</span>
-            <span style="display:flex;gap:90px">
-              <span>Share %</span><span>Invested</span><span>Returned</span>
-            </span>
+            <span style="display:flex;gap:90px"><span>Share %</span><span>Invested</span><span>Returned</span></span>
           </div>
           ${partnersHTML}
-        </div>
-      `;
-
+        </div>`;
       grid.appendChild(card);
     });
   }
 
-  function toggleEditReceived(id) {
-    const row = document.getElementById('recv-edit-' + id);
-    row.classList.toggle('show');
-  }
-
-  function saveReceived(id) {
-    const input = document.getElementById('recv-input-' + id);
-    const val = parseFloat(input.value) || 0;
-    const inv = investments.find(i => i.id === id);
-    if (!inv) return;
-    inv.received = val;
-    saveToStorage();
-    renderAll();
-    showToast('Returns updated');
-  }
-
-  function deleteInvestment(id) {
-    investments = investments.filter(i => i.id !== id);
-    saveToStorage();
-    renderAll();
-    showToast('Investment removed');
-  }
-
-  // ── STATS ──
   function updateStats() {
-    const totalInv = investments.reduce((a, b) => a + (b.total || 0), 0);
-    const totalRec = investments.reduce((a, b) => a + (b.received || 0), 0);
-    const count = investments.length;
-    const allPartners = new Set();
-    investments.forEach(inv => inv.partners.forEach(p => allPartners.add(p.name.toLowerCase())));
-
-    document.getElementById('s-total').textContent = fmtPKR(totalInv);
+    const totalInv  = investments.reduce((a, b) => a + b.total,    0);
+    const totalRec  = investments.reduce((a, b) => a + b.received, 0);
+    const partners  = new Set();
+    investments.forEach(inv => inv.partners.forEach(p => partners.add(p.name.toLowerCase())));
+    document.getElementById('s-total').textContent    = fmtPKR(totalInv);
     document.getElementById('s-received').textContent = fmtPKR(totalRec);
-    document.getElementById('s-count').textContent = count;
-    document.getElementById('s-partners').textContent = allPartners.size;
+    document.getElementById('s-count').textContent    = investments.length;
+    document.getElementById('s-partners').textContent = partners.size;
   }
 
-  // ── HELPERS ──
+  // ── PANEL TOGGLE ──────────────────────────────────────────────────────────
+  function toggleFormPanel() {
+    formOpen = !formOpen;
+    document.getElementById('form-panel').classList.toggle('collapsed', !formOpen);
+    const toggle = document.getElementById('panel-toggle');
+    toggle.classList.toggle('is-collapsed', !formOpen);
+    toggle.style.left = formOpen ? '360px' : '0px';
+    document.getElementById('new-btn-label').textContent = formOpen ? 'Close Form' : 'New Investment';
+    document.getElementById('new-inv-btn').classList.toggle('active-form', formOpen);
+    if (formOpen) setTimeout(() => document.getElementById('inv-name').focus(), 360);
+  }
+
+  // ── HELPERS ───────────────────────────────────────────────────────────────
   function fmtPKR(n) {
+    n = parseFloat(n) || 0;
     if (n >= 1_000_000) return 'PKR ' + (n / 1_000_000).toFixed(2) + 'M';
-    if (n >= 1_000) return 'PKR ' + (n / 1_000).toFixed(1) + 'K';
+    if (n >= 1_000)     return 'PKR ' + (n / 1_000).toFixed(1) + 'K';
     return 'PKR ' + n.toLocaleString();
   }
 
   function formatDate(d) {
     if (!d) return '—';
-    const dt = new Date(d + 'T00:00:00');
+    const dt = new Date(d.includes('T') ? d : d + 'T00:00:00');
     return dt.toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' });
-  }
-
-  function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3000);
-  }
-
-  let formOpen = true;
-
-  function toggleFormPanel() {
-    const panel = document.getElementById('form-panel');
-    const toggle = document.getElementById('panel-toggle');
-    const btn = document.getElementById('new-inv-btn');
-    const label = document.getElementById('new-btn-label');
-    formOpen = !formOpen;
-    panel.classList.toggle('collapsed', !formOpen);
-    toggle.classList.toggle('is-collapsed', !formOpen);
-    // position the toggle tab flush to left edge when collapsed
-    toggle.style.left = formOpen ? '360px' : '0px';
-    label.textContent = formOpen ? 'Close Form' : 'New Investment';
-    btn.classList.toggle('active-form', formOpen);
-    if (formOpen) {
-      setTimeout(() => document.getElementById('inv-name').focus(), 360);
-    }
-  }
-
-  function scrollToForm() {
-    if (!formOpen) toggleFormPanel();
-    document.getElementById('form-panel').scrollTo({ top: 0, behavior: 'smooth' });
-    document.getElementById('inv-name').focus();
   }
 </script>
 

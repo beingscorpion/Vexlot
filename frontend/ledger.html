@@ -273,10 +273,7 @@
         Ledger
       </a>
       <div class="nav-label">Account</div>
-      <a href="#" class="nav-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
-        Settings
-      </a>
+      
       <a href="auth.html" class="nav-item">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         Sign Out
@@ -430,40 +427,48 @@
   </div><!-- /main -->
 </div><!-- /app -->
 
+<script src="api.js"></script>
 <script>
-  // ── STATE ──
-  let investments = [];
+  // ── STATE ──────────────────────────────────────────────────────────────────
+  let ledgerData   = null;   // full API response from GET /ledger
   let statusFilter = 'all';
   let expandedRows = new Set();
 
-  const CAT_LABELS = { 'real-estate':'Real Estate', 'stocks':'Stocks', 'business':'Business', 'commodities':'Commodities', 'other':'Other' };
-  const CAT_ICONS  = { 'real-estate':'RE', 'stocks':'ST', 'business':'BZ', 'commodities':'CM', 'other':'OT' };
-
+  const CAT_LABELS = { 'real-estate':'Real Estate','stocks':'Stocks','business':'Business','commodities':'Commodities','other':'Other' };
+  const CAT_ICONS  = { 'real-estate':'RE','stocks':'ST','business':'BZ','commodities':'CM','other':'OT' };
   const AVATAR_COLORS = [
-    { bg:'#1a4020', text:'#a8d5ad' },
-    { bg:'#1a2540', text:'#a8c5e8' },
-    { bg:'#401a1a', text:'#e8a8a8' },
-    { bg:'#2a1a40', text:'#c8a8e8' },
-    { bg:'#401a30', text:'#e8a8d0' },
-    { bg:'#2a3010', text:'#c8d890' },
+    {bg:'#1a4020',text:'#a8d5ad'},{bg:'#1a2540',text:'#a8c5e8'},
+    {bg:'#401a1a',text:'#e8a8a8'},{bg:'#2a1a40',text:'#c8a8e8'},
+    {bg:'#401a30',text:'#e8a8d0'},{bg:'#2a3010',text:'#c8d890'},
   ];
 
-  // ── INIT ──
-  document.addEventListener('DOMContentLoaded', () => {
-    loadData();
-    renderSummary();
-    renderLedger();
-    renderSidebar();
+  // ── INIT ───────────────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', async () => {
+    if (!authGuard()) return;
+    await loadLedger();
+
+    document.querySelector('a[href="auth.html"]').addEventListener('click', async e => {
+      e.preventDefault();
+      const refresh = Auth.getRefresh();
+      if (refresh) await api.post('/auth/logout', { refresh_token: refresh }).catch(() => {});
+      Auth.clear();
+      window.location.href = 'auth.html';
+    });
   });
 
-  function loadData() {
+  async function loadLedger() {
     try {
-      const inv = localStorage.getItem('verdant_investments');
-      if (inv) investments = JSON.parse(inv);
-    } catch(e) {}
+      const res  = await api.get('/ledger');
+      ledgerData = await api.json(res);
+      renderSummary();
+      renderLedger();
+      renderSidebar();
+    } catch (e) {
+      showToast('Failed to load ledger: ' + e.message, 'error');
+    }
   }
 
-  // ── STATUS FILTER ──
+  // ── STATUS FILTER ─────────────────────────────────────────────────────────
   function setStatusFilter(val, el) {
     statusFilter = val;
     document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
@@ -471,51 +476,48 @@
     renderLedger();
   }
 
-  // ── SUMMARY ──
+  // ── SUMMARY ───────────────────────────────────────────────────────────────
   function renderSummary() {
-    const totalCap = investments.reduce((a,b) => a+(b.total||0), 0);
-    const totalRet = investments.reduce((a,b) => a+(b.received||0), 0);
-    const pnl = totalRet - totalCap;
-    const settled = investments.filter(i => i.received > 0).length;
-    const pending = investments.filter(i => !i.received || i.received === 0).reduce((a,b) => a+(b.total||0), 0);
-
-    document.getElementById('s-capital').textContent  = fmtPKR(totalCap);
-    document.getElementById('s-returns').textContent  = fmtPKR(totalRet);
+    if (!ledgerData) return;
+    const s = ledgerData.summary;
+    document.getElementById('s-capital').textContent  = fmtPKR(s.total_capital);
+    document.getElementById('s-returns').textContent  = fmtPKR(s.total_returned);
+    const pnl   = parseFloat(s.net_pnl);
     const pnlEl = document.getElementById('s-pnl');
     pnlEl.textContent = (pnl >= 0 ? '+' : '') + fmtPKR(Math.abs(pnl));
-    pnlEl.className = 'sum-val ' + (pnl >= 0 ? 'green' : 'red');
-    document.getElementById('s-settled').textContent  = `${settled} / ${investments.length}`;
-    document.getElementById('s-pending').textContent  = fmtPKR(pending);
+    pnlEl.className   = 'sum-val ' + (pnl >= 0 ? 'green' : 'red');
+    document.getElementById('s-settled').textContent  = `${s.settled_count} / ${s.total_deals}`;
+    document.getElementById('s-pending').textContent  = fmtPKR(s.pending_capital);
   }
 
-  // ── RENDER LEDGER TABLE ──
+  // ── LEDGER TABLE ──────────────────────────────────────────────────────────
   function renderLedger() {
-    const search   = document.getElementById('search-input').value.toLowerCase();
-    const catF     = document.getElementById('cat-filter').value;
-    const sortF    = document.getElementById('sort-filter').value;
-    const tbody    = document.getElementById('ledger-tbody');
-    const emptyEl  = document.getElementById('table-empty');
-    const countEl  = document.getElementById('record-count');
+    if (!ledgerData) return;
+    const search  = document.getElementById('search-input').value.toLowerCase();
+    const catF    = document.getElementById('cat-filter').value;
+    const sortF   = document.getElementById('sort-filter').value;
+    const tbody   = document.getElementById('ledger-tbody');
+    const emptyEl = document.getElementById('table-empty');
+    const countEl = document.getElementById('record-count');
 
-    // filter
-    let list = investments.filter(inv => {
+    let list = ledgerData.entries.filter(inv => {
       const matchSearch = inv.name.toLowerCase().includes(search) ||
-        inv.partners.some(p => p.name.toLowerCase().includes(search));
-      const matchCat    = !catF || inv.cat === catF;
-      const matchStatus = statusFilter === 'all'
-        ? true
-        : statusFilter === 'settled'
-          ? (inv.received > 0)
-          : (!inv.received || inv.received === 0);
+        (inv.partners||[]).some(p => p.partner_name.toLowerCase().includes(search));
+      const matchCat    = !catF || inv.category === catF;
+      const recv        = parseFloat(inv.received_amount) || 0;
+      const matchStatus = statusFilter === 'all' ? true
+        : statusFilter === 'settled' ? recv > 0
+        : recv === 0;
       return matchSearch && matchCat && matchStatus;
     });
 
-    // sort
     list = list.slice().sort((a,b) => {
-      if (sortF === 'date-desc') return new Date(b.date||b.createdAt) - new Date(a.date||a.createdAt);
-      if (sortF === 'date-asc')  return new Date(a.date||a.createdAt) - new Date(b.date||b.createdAt);
-      if (sortF === 'total-desc') return (b.total||0) - (a.total||0);
-      if (sortF === 'total-asc')  return (a.total||0) - (b.total||0);
+      const da = new Date(a.deal_date || a.created_at);
+      const db = new Date(b.deal_date || b.created_at);
+      if (sortF === 'date-desc')  return db - da;
+      if (sortF === 'date-asc')   return da - db;
+      if (sortF === 'total-desc') return parseFloat(b.total_amount)  - parseFloat(a.total_amount);
+      if (sortF === 'total-asc')  return parseFloat(a.total_amount)  - parseFloat(b.total_amount);
       return 0;
     });
 
@@ -527,105 +529,83 @@
       return;
     }
     emptyEl.style.display = 'none';
-
     tbody.innerHTML = '';
 
     list.forEach(inv => {
-      const pnl    = (inv.received||0) - inv.total;
-      const status = inv.received > 0
-        ? (inv.received >= inv.total ? 'settled' : 'partial')
-        : 'pending';
-      const statusLabel = { settled:'Settled', pending:'Pending', partial:'Partial' }[status];
+      const total    = parseFloat(inv.total_amount)    || 0;
+      const received = parseFloat(inv.received_amount) || 0;
+      const pnl      = received - total;
+      const status   = inv.status;
+      const statusLabel = { settled:'Settled', pending:'Pending', partial:'Partial' }[status] || status;
       const isExpanded  = expandedRows.has(inv.id);
-      const catIcon     = CAT_ICONS[inv.cat] || 'OT';
-      const catLabel    = CAT_LABELS[inv.cat] || 'Other';
+      const catIcon     = CAT_ICONS[inv.category]  || 'OT';
+      const catLabel    = CAT_LABELS[inv.category] || 'Other';
+      const dateStr     = inv.deal_date ? inv.deal_date.split('T')[0] : '';
 
-      // main row
       const tr = document.createElement('tr');
       tr.className = isExpanded ? 'expanded-parent' : '';
-      tr.onclick = () => toggleRow(inv.id, tr);
+      tr.onclick   = () => toggleRow(inv.id);
       tr.innerHTML = `
-        <td>
-          <button class="expand-btn ${isExpanded ? 'open' : ''}" id="expbtn-${inv.id}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
-        </td>
-        <td>
-          <div class="td-inv">
-            <div class="td-inv-icon">${catIcon}</div>
-            <div>
-              <div class="td-inv-name">${inv.name}</div>
-              <div class="td-inv-cat">${catLabel}</div>
-            </div>
-          </div>
-        </td>
-        <td style="color:var(--muted);font-size:0.64rem">${formatDate(inv.date)}</td>
-        <td style="color:var(--muted);font-size:0.64rem">${inv.partners.length} partner${inv.partners.length!==1?'s':''}</td>
-        <td class="right"><div class="td-amount">${fmtPKR(inv.total)}</div></td>
-        <td class="right"><div class="td-amount ${inv.received>0?'green':'dim'}">${inv.received>0?fmtPKR(inv.received):'—'}</div></td>
-        <td class="right"><div class="td-amount ${pnl>=0?'green':'dim'}" style="${pnl<0?'color:#e08080':''}">${inv.received>0?(pnl>=0?'+':'')+fmtPKR(Math.abs(pnl)):'—'}</div></td>
+        <td><button class="expand-btn ${isExpanded ? 'open' : ''}" id="expbtn-${inv.id}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </button></td>
+        <td><div class="td-inv">
+          <div class="td-inv-icon">${catIcon}</div>
+          <div><div class="td-inv-name">${inv.name}</div><div class="td-inv-cat">${catLabel}</div></div>
+        </div></td>
+        <td style="color:var(--muted);font-size:0.64rem">${formatDate(dateStr)}</td>
+        <td style="color:var(--muted);font-size:0.64rem">${(inv.partners||[]).length} partner${(inv.partners||[]).length!==1?'s':''}</td>
+        <td class="right"><div class="td-amount">${fmtPKR(total)}</div></td>
+        <td class="right"><div class="td-amount ${received>0?'green':'dim'}">${received>0?fmtPKR(received):'—'}</div></td>
+        <td class="right"><div class="td-amount ${pnl>=0?'green':'dim'}" style="${pnl<0?'color:#e08080':''}">${received>0?(pnl>=0?'+':'')+fmtPKR(Math.abs(pnl)):'—'}</div></td>
         <td class="center"><span class="badge ${status}">${statusLabel}</span></td>
       `;
       tbody.appendChild(tr);
 
-      // breakdown row (partner detail)
+      // Breakdown row
       const btr = document.createElement('tr');
       btr.className = 'breakdown-row' + (isExpanded ? ' show' : '');
       btr.id = 'breakdown-' + inv.id;
 
-      const bRows = inv.partners.map(p => {
-        const pInvested = (p.pct/100)*inv.total;
-        const pReturned = inv.received>0 ? (p.pct/100)*inv.received : 0;
+      const bRows = (inv.partners || []).map(p => {
+        const pInvested = parseFloat(p.capital_amount)  || 0;
+        const pReturned = parseFloat(p.returned_amount) || 0;
         const pPnl      = pReturned - pInvested;
-        const initials  = p.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
-        const ac        = AVATAR_COLORS[Math.abs(hashStr(p.name)) % AVATAR_COLORS.length];
+        const initials  = p.partner_name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+        const ac        = AVATAR_COLORS[Math.abs(hashStr(p.partner_name)) % AVATAR_COLORS.length];
         return `<tr>
-          <td>
-            <div style="display:flex;align-items:center;gap:8px">
-              <div style="width:22px;height:22px;border-radius:50%;background:${ac.bg};color:${ac.text};display:flex;align-items:center;justify-content:center;font-size:0.52rem;flex-shrink:0;border:1px solid rgba(255,255,255,.06)">${initials}</div>
-              ${p.name}
-            </div>
-          </td>
-          <td class="right bd-pct">${p.pct}%</td>
+          <td><div style="display:flex;align-items:center;gap:8px">
+            <div style="width:22px;height:22px;border-radius:50%;background:${ac.bg};color:${ac.text};display:flex;align-items:center;justify-content:center;font-size:0.52rem;flex-shrink:0;border:1px solid rgba(255,255,255,.06)">${initials}</div>
+            ${p.partner_name}
+          </div></td>
+          <td class="right bd-pct">${parseFloat(p.percentage).toFixed(2)}%</td>
           <td class="right">${fmtPKR(pInvested)}</td>
           <td class="right ${pReturned>0?'bd-ret':'bd-nil'}">${pReturned>0?fmtPKR(pReturned):'—'}</td>
           <td class="right ${pPnl>=0?'bd-ret':'bd-nil'}" style="${pPnl<0?'color:#e08080':''}">${pReturned>0?(pPnl>=0?'+':'')+fmtPKR(Math.abs(pPnl)):'—'}</td>
         </tr>`;
       }).join('');
 
-      btr.innerHTML = `
-        <td colspan="8">
-          <div class="breakdown-inner">
-            <table class="breakdown-table">
-              <thead>
-                <tr>
-                  <th>Partner</th>
-                  <th class="right">Share</th>
-                  <th class="right">Invested</th>
-                  <th class="right">Returned</th>
-                  <th class="right">P&L</th>
-                </tr>
-              </thead>
-              <tbody>${bRows}</tbody>
-            </table>
-          </div>
-        </td>`;
+      btr.innerHTML = `<td colspan="8"><div class="breakdown-inner">
+        <table class="breakdown-table">
+          <thead><tr>
+            <th>Partner</th><th class="right">Share</th>
+            <th class="right">Invested</th><th class="right">Returned</th><th class="right">P&L</th>
+          </tr></thead>
+          <tbody>${bRows}</tbody>
+        </table></div></td>`;
       tbody.appendChild(btr);
     });
   }
 
-  function toggleRow(id, tr) {
-    if (expandedRows.has(id)) {
-      expandedRows.delete(id);
-    } else {
-      expandedRows.add(id);
-    }
-    // re-render to update state cleanly
+  function toggleRow(id) {
+    if (expandedRows.has(id)) expandedRows.delete(id);
+    else expandedRows.add(id);
     renderLedger();
   }
 
-  // ── RIGHT SIDEBAR ──
+  // ── SIDEBAR ───────────────────────────────────────────────────────────────
   function renderSidebar() {
+    if (!ledgerData) return;
     renderPartnerLeaderboard();
     renderCategoryBreakdown();
     renderTimeline();
@@ -633,144 +613,113 @@
 
   function renderPartnerLeaderboard() {
     const lb = document.getElementById('partner-lb');
-    const partnerMap = {};
-    investments.forEach(inv => {
-      inv.partners.forEach(p => {
-        const key = p.name.toLowerCase();
-        if (!partnerMap[key]) partnerMap[key] = { name:p.name, invested:0, deals:0 };
-        partnerMap[key].invested += (p.pct/100)*inv.total;
-        partnerMap[key].deals++;
-      });
-    });
-
-    const sorted = Object.values(partnerMap).sort((a,b) => b.invested-a.invested).slice(0,6);
-
-    if (sorted.length === 0) {
+    const list = (ledgerData.partner_leaderboard || []).slice(0, 6);
+    if (list.length === 0) {
       lb.innerHTML = '<div style="font-size:.62rem;color:var(--muted);padding:8px 0">No partner data yet.</div>';
       return;
     }
-
-    lb.innerHTML = sorted.map((p, i) => {
-      const ac = AVATAR_COLORS[Math.abs(hashStr(p.name)) % AVATAR_COLORS.length];
-      const initials = p.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+    lb.innerHTML = list.map((p, i) => {
+      const ac       = p.avatar_bg ? { bg: p.avatar_bg, text: p.avatar_text } : AVATAR_COLORS[Math.abs(hashStr(p.partner_name)) % AVATAR_COLORS.length];
+      const initials = p.partner_name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
       return `<div class="lb-row">
         <div class="lb-rank">${i+1}</div>
         <div class="lb-avatar" style="background:${ac.bg};color:${ac.text}">${initials}</div>
         <div class="lb-info">
-          <div class="lb-name">${p.name}</div>
-          <div class="lb-deals">${p.deals} deal${p.deals!==1?'s':''}</div>
+          <div class="lb-name">${p.partner_name}</div>
+          <div class="lb-deals">${p.deal_count} deal${p.deal_count!==1?'s':''}</div>
         </div>
-        <div class="lb-amt">${fmtPKR(p.invested)}</div>
+        <div class="lb-amt">${fmtPKR(p.total_invested)}</div>
       </div>`;
     }).join('');
   }
 
   function renderCategoryBreakdown() {
-    const el = document.getElementById('cat-breakdown');
-    const catMap = {};
-    let grandTotal = 0;
-    investments.forEach(inv => {
-      const c = inv.cat || 'other';
-      catMap[c] = (catMap[c]||0) + (inv.total||0);
-      grandTotal += (inv.total||0);
-    });
-
-    if (grandTotal === 0) {
+    const el   = document.getElementById('cat-breakdown');
+    const list = ledgerData.category_breakdown || [];
+    if (list.length === 0) {
       el.innerHTML = '<div style="font-size:.62rem;color:var(--muted)">No data yet.</div>';
       return;
     }
-
-    const sorted = Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
-    el.innerHTML = sorted.map(([cat, amt]) => {
-      const pct = grandTotal > 0 ? ((amt/grandTotal)*100).toFixed(1) : 0;
-      return `<div class="cat-row">
+    el.innerHTML = list.map(c => `
+      <div class="cat-row">
         <div class="cat-head">
-          <div class="cat-name">${CAT_LABELS[cat]||cat}</div>
-          <div class="cat-pct-label">${pct}%</div>
+          <div class="cat-name">${CAT_LABELS[c.category]||c.category}</div>
+          <div class="cat-pct-label">${parseFloat(c.percentage).toFixed(1)}%</div>
         </div>
-        <div class="cat-bar"><div class="cat-fill" style="width:${pct}%"></div></div>
-        <div class="cat-sub">${fmtPKR(amt)}</div>
+        <div class="cat-bar"><div class="cat-fill" style="width:${parseFloat(c.percentage).toFixed(1)}%"></div></div>
+        <div class="cat-sub">${fmtPKR(c.total)}</div>
+      </div>`).join('');
+  }
+
+  function renderTimeline() {
+    const el   = document.getElementById('activity-timeline');
+    const list = (ledgerData.recent_events || []).slice(0, 6);
+    if (list.length === 0) {
+      el.innerHTML = '<div style="font-size:.62rem;color:var(--muted)">No activity yet.</div>';
+      return;
+    }
+    el.innerHTML = list.map(ev => {
+      const delta = parseFloat(ev.delta);
+      const type  = delta >= 0 ? 'return' : 'adjustment';
+      return `<div class="tl-item">
+        <div class="tl-dot ${delta > 0 ? 'filled' : ''}"></div>
+        <div class="tl-body">
+          <div class="tl-name">${ev.investment_name_snapshot}</div>
+          <div class="tl-date">${delta > 0 ? 'Return received' : 'Adjustment'} · ${formatDate(ev.created_at)}</div>
+          <div class="tl-amt">${delta >= 0 ? '+' : ''}${fmtPKR(delta)}</div>
+        </div>
       </div>`;
     }).join('');
   }
 
-  function renderTimeline() {
-    const el = document.getElementById('activity-timeline');
-    // build events: each investment creation + each return received
-    const events = [];
-    investments.forEach(inv => {
-      events.push({ date: inv.date||inv.createdAt, label: inv.name, type:'invest', amt:inv.total });
-      if (inv.received > 0) events.push({ date: inv.date||inv.createdAt, label: inv.name, type:'return', amt:inv.received });
-    });
-
-    events.sort((a,b) => new Date(b.date)-new Date(a.date));
-    const top = events.slice(0,6);
-
-    if (top.length === 0) {
-      el.innerHTML = '<div style="font-size:.62rem;color:var(--muted)">No activity yet.</div>';
-      return;
-    }
-
-    el.innerHTML = top.map(ev => `
-      <div class="tl-item">
-        <div class="tl-dot ${ev.type==='return'?'filled':''}"></div>
-        <div class="tl-body">
-          <div class="tl-name">${ev.label}</div>
-          <div class="tl-date">${ev.type==='return'?'Return received':'Invested'} · ${formatDate(ev.date)}</div>
-          <div class="tl-amt">${ev.type==='return'?'+':'−'} ${fmtPKR(ev.amt)}</div>
-        </div>
-      </div>`).join('');
-  }
-
-  // ── EXPORT CSV ──
+  // ── EXPORT CSV ────────────────────────────────────────────────────────────
   function exportCSV() {
+    if (!ledgerData) return;
     const rows = [['Investment','Category','Date','Total Capital','Returned','P&L','Status','Partner','Share %','Partner Capital','Partner Return']];
-    investments.forEach(inv => {
-      const pnl = (inv.received||0)-inv.total;
-      const status = inv.received>0?(inv.received>=inv.total?'Settled':'Partial'):'Pending';
-      inv.partners.forEach((p,i) => {
-        const pCap = (p.pct/100)*inv.total;
-        const pRet = inv.received>0?(p.pct/100)*inv.received:0;
+    ledgerData.entries.forEach(inv => {
+      const total    = parseFloat(inv.total_amount)    || 0;
+      const received = parseFloat(inv.received_amount) || 0;
+      const pnl      = received - total;
+      const status   = { settled:'Settled', pending:'Pending', partial:'Partial' }[inv.status] || inv.status;
+      (inv.partners || []).forEach((p, i) => {
         rows.push([
-          i===0?inv.name:'',
-          i===0?CAT_LABELS[inv.cat]||inv.cat:'',
-          i===0?inv.date:'',
-          i===0?inv.total:'',
-          i===0?(inv.received||0):'',
-          i===0?pnl:'',
-          i===0?status:'',
-          p.name, p.pct+'%',
-          pCap.toFixed(2),
-          pRet.toFixed(2)
+          i===0 ? inv.name : '',
+          i===0 ? (CAT_LABELS[inv.category]||inv.category) : '',
+          i===0 ? (inv.deal_date||'').split('T')[0] : '',
+          i===0 ? total : '',
+          i===0 ? received : '',
+          i===0 ? pnl : '',
+          i===0 ? status : '',
+          p.partner_name,
+          parseFloat(p.percentage).toFixed(2) + '%',
+          parseFloat(p.capital_amount).toFixed(2),
+          parseFloat(p.returned_amount).toFixed(2),
         ]);
       });
     });
-
-    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], {type:'text/csv'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
+    const csv  = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type:'text/csv' });
+    const a    = document.createElement('a');
+    a.href     = URL.createObjectURL(blob);
     a.download = 'verdant_ledger_' + new Date().toISOString().split('T')[0] + '.csv';
     a.click();
   }
 
-  // ── HELPERS ──
+  // ── HELPERS ───────────────────────────────────────────────────────────────
   function fmtPKR(n) {
-    if (!n && n!==0) return '—';
-    if (n >= 1_000_000) return 'PKR '+(n/1_000_000).toFixed(2)+'M';
-    if (n >= 1_000) return 'PKR '+(n/1_000).toFixed(1)+'K';
-    return 'PKR '+n.toLocaleString();
+    n = parseFloat(n) || 0;
+    if (n >= 1_000_000) return 'PKR ' + (n/1_000_000).toFixed(2) + 'M';
+    if (n >= 1_000)     return 'PKR ' + (n/1_000).toFixed(1) + 'K';
+    return 'PKR ' + n.toLocaleString();
   }
-
   function formatDate(d) {
     if (!d) return '—';
-    const dt = new Date((d.includes('T')?d:d+'T00:00:00'));
-    return dt.toLocaleDateString('en-PK',{day:'numeric',month:'short',year:'numeric'});
+    const dt = new Date(d.includes('T') ? d : d + 'T00:00:00');
+    return dt.toLocaleDateString('en-PK', { day:'numeric', month:'short', year:'numeric' });
   }
-
   function hashStr(s) {
-    let h=0;
-    for (let i=0;i<s.length;i++) h=(Math.imul(31,h)+s.charCodeAt(i))|0;
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
     return h;
   }
 </script>
