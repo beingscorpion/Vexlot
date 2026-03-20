@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Verdant — Investment & Accounting</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --black:       #080b08;
+      --green-deep:  #0b1f0d;
+      --green-dark:  #122b14;
+      --green-mid:   #1a4020;
+      --green-vivid: #2d7a3a;
+      --green-glow:  #3aab4a;
+      --green-pale:  #a8d5ad;
+      --white:       #e8ede9;
+      --muted:       #5a7a5e;
+      --border:      rgba(45, 122, 58, 0.18);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--black);
+      color: var(--white);
+      font-family: 'DM Mono', monospace;
+      overflow-x: hidden;
+    }
+
+    /* ── NOISE OVERLAY ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+      opacity: 0.035;
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* ── TOP BAR ── */
+    .topbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 22px 52px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(8, 11, 8, 0.72);
+      backdrop-filter: blur(16px);
+    }
+
+    .logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.55rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      color: var(--white);
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .logo-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green-glow);
+      box-shadow: 0 0 10px var(--green-glow);
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 10px var(--green-glow); }
+      50%       { opacity: 0.4; box-shadow: 0 0 4px var(--green-glow); }
+    }
+
+    .login-btn {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--green-pale);
+      background: transparent;
+      border: 1px solid var(--green-mid);
+      padding: 10px 26px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: color 0.3s, border-color 0.3s;
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    .login-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--green-mid);
+      transform: translateX(-101%);
+      transition: transform 0.35s cubic-bezier(0.77,0,0.175,1);
+    }
+
+    .login-btn:hover { border-color: var(--green-vivid); color: var(--white); }
+    .login-btn:hover::before { transform: translateX(0); }
+    .login-btn span { position: relative; z-index: 1; }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      padding: 0 24px;
+    }
+
+    /* radial glow behind text */
+    .hero::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -54%);
+      width: 560px;
+      height: 360px;
+      background: radial-gradient(ellipse, rgba(42,110,52,0.22) 0%, transparent 72%);
+      pointer-events: none;
+    }
+
+    /* subtle grid lines */
+    .grid-bg {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(45,122,58,0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(45,122,58,0.06) 1px, transparent 1px);
+      background-size: 64px 64px;
+      mask-image: radial-gradient(ellipse 70% 65% at 50% 50%, black 30%, transparent 100%);
+    }
+
+    /* ── HERO CONTENT ── */
+    .hero-content {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+      max-width: 680px;
+      animation: fadeUp 1s cubic-bezier(0.23,1,0.32,1) both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(28px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .eyebrow {
+      font-size: 0.65rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--green-glow);
+      margin-bottom: 24px;
+      animation: fadeUp 1s 0.1s cubic-bezier(0.23,1,0.32,1) both;
+    }
+
+    .hero-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(3rem, 7vw, 5.8rem);
+      font-weight: 300;
+      line-height: 1.05;
+      color: var(--white);
+      letter-spacing: -0.01em;
+      margin-bottom: 28px;
+      animation: fadeUp 1s 0.18s cubic-bezier(0.23,1,0.32,1) both;
+    }
+
+    .hero-title em {
+      font-style: italic;
+      color: var(--green-pale);
+    }
+
+    .hero-sub {
+      font-size: 0.78rem;
+      line-height: 1.85;
+      color: var(--muted);
+      max-width: 420px;
+      margin: 0 auto 44px;
+      letter-spacing: 0.02em;
+      animation: fadeUp 1s 0.28s cubic-bezier(0.23,1,0.32,1) both;
+    }
+
+    .cta-row {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      align-items: center;
+      animation: fadeUp 1s 0.38s cubic-bezier(0.23,1,0.32,1) both;
+    }
+
+    .cta-primary {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      background: var(--green-vivid);
+      color: var(--black);
+      border: none;
+      padding: 14px 36px;
+      cursor: pointer;
+      font-weight: 500;
+      position: relative;
+      overflow: hidden;
+      transition: background 0.3s;
+      text-decoration: none;
+    }
+
+    .cta-primary::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--green-glow);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .cta-primary:hover::after { opacity: 1; }
+    .cta-primary span { position: relative; z-index: 1; }
+
+    .cta-ghost {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 14px 8px;
+      transition: color 0.3s;
+      text-decoration: none;
+    }
+
+    .cta-ghost:hover { color: var(--green-pale); }
+
+    /* ── STAT STRIP ── */
+    .stat-strip {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      gap: 56px;
+      margin-top: 72px;
+      animation: fadeUp 1s 0.5s cubic-bezier(0.23,1,0.32,1) both;
+    }
+
+    .stat {
+      text-align: center;
+    }
+
+    .stat-num {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2rem;
+      font-weight: 400;
+      color: var(--green-pale);
+      display: block;
+      line-height: 1;
+    }
+
+    .stat-label {
+      font-size: 0.6rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 6px;
+      display: block;
+    }
+
+    .stat-divider {
+      width: 1px;
+      background: var(--border);
+      align-self: stretch;
+    }
+
+    /* ── MARQUEE ── */
+    .marquee-wrap {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      overflow: hidden;
+      border-top: 1px solid var(--border);
+      padding: 14px 0;
+      background: rgba(8,11,8,0.6);
+      backdrop-filter: blur(8px);
+      z-index: 10;
+    }
+
+    .marquee-track {
+      display: flex;
+      width: max-content;
+      animation: scroll 32s linear infinite;
+    }
+
+    @keyframes scroll {
+      from { transform: translateX(0); }
+      to   { transform: translateX(-50%); }
+    }
+
+    .marquee-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 40px;
+      font-size: 0.65rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .marquee-item .tag {
+      color: var(--green-glow);
+      font-weight: 500;
+    }
+
+    .marquee-sep {
+      width: 3px; height: 3px;
+      border-radius: 50%;
+      background: var(--green-mid);
+      flex-shrink: 0;
+    }
+
+    /* ── CORNER ACCENTS ── */
+    .corner {
+      position: absolute;
+      width: 18px; height: 18px;
+      z-index: 2;
+    }
+    .corner::before, .corner::after {
+      content: '';
+      position: absolute;
+      background: var(--green-vivid);
+    }
+    .corner::before { width: 100%; height: 1px; top: 0; left: 0; }
+    .corner::after  { width: 1px; height: 100%; top: 0; left: 0; }
+
+    .corner-tl { top: 88px; left: 52px; }
+    .corner-tr { top: 88px; right: 52px; transform: scaleX(-1); }
+    .corner-bl { bottom: 52px; left: 52px; transform: scaleY(-1); }
+    .corner-br { bottom: 52px; right: 52px; transform: scale(-1); }
+
+    /* ── FLOATING DATA CARDS ── */
+    .float-card {
+      position: absolute;
+      background: rgba(18, 43, 20, 0.55);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+      padding: 14px 20px;
+      z-index: 3;
+      font-size: 0.62rem;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      animation: float 6s ease-in-out infinite;
+    }
+
+    .float-card .card-label {
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      font-size: 0.58rem;
+      color: var(--green-glow);
+      margin-bottom: 6px;
+    }
+
+    .float-card .card-val {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.4rem;
+      font-weight: 400;
+      color: var(--white);
+      line-height: 1;
+    }
+
+    .float-card .card-sub {
+      margin-top: 4px;
+      font-size: 0.6rem;
+      color: var(--muted);
+    }
+
+    .card-left {
+      left: 6%;
+      top: 38%;
+      animation-delay: 0s;
+    }
+
+    .card-right {
+      right: 6%;
+      top: 42%;
+      animation-delay: -3s;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50%       { transform: translateY(-10px); }
+    }
+
+    /* partner pills inside card */
+    .partner-row {
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    .pill {
+      font-size: 0.55rem;
+      letter-spacing: 0.1em;
+      background: rgba(45,122,58,0.15);
+      border: 1px solid rgba(45,122,58,0.28);
+      color: var(--green-pale);
+      padding: 3px 8px;
+      border-radius: 999px;
+    }
+
+    @media (max-width: 900px) {
+      .float-card { display: none; }
+      .topbar { padding: 18px 24px; }
+      .corner-tl { left: 24px; }
+      .corner-tr { right: 24px; }
+      .corner-bl { left: 24px; }
+      .corner-br { right: 24px; }
+      .stat-strip { gap: 32px; }
+    }
+
+    @media (max-width: 520px) {
+      .stat-strip { flex-direction: column; gap: 20px; align-items: center; }
+      .stat-divider { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="logo">
+      <div class="logo-dot"></div>
+      Verdant
+    </div>
+    <a href="#" class="login-btn"><span>Log In</span></a>
+  </header>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="grid-bg"></div>
+
+    <!-- corner brackets -->
+    <div class="corner corner-tl"></div>
+    <div class="corner corner-tr"></div>
+    <div class="corner corner-bl"></div>
+    <div class="corner corner-br"></div>
+
+    <!-- floating data cards -->
+    <div class="float-card card-left">
+      <div class="card-label">Active Portfolio</div>
+      <div class="card-val">$284,500</div>
+      <div class="card-sub">Across 3 investments</div>
+      <div class="partner-row">
+        <span class="pill">Ahmed 40%</span>
+        <span class="pill">Sara 35%</span>
+        <span class="pill">You 25%</span>
+      </div>
+    </div>
+
+    <div class="float-card card-right">
+      <div class="card-label">Last Distribution</div>
+      <div class="card-val">$12,840</div>
+      <div class="card-sub">Settled · 2 partners</div>
+      <div class="partner-row">
+        <span class="pill">Q1 2025</span>
+        <span class="pill">Verified</span>
+      </div>
+    </div>
+
+    <!-- main text -->
+    <div class="hero-content">
+      <p class="eyebrow">Investment Accounting Platform</p>
+      <h1 class="hero-title">
+        Capital, split<br><em>with precision.</em>
+      </h1>
+      <p class="hero-sub">
+        Define partners, assign percentages, track every rupee.
+        When returns arrive, Verdant knows exactly who gets what.
+      </p>
+      <div class="cta-row">
+        <a href="#" class="cta-primary"><span>Get Started</span></a>
+        <a href="#" class="cta-ghost">See how it works →</a>
+      </div>
+    </div>
+
+    <!-- stat strip above marquee -->
+    <div class="stat-strip">
+      <div class="stat">
+        <span class="stat-num">∞</span>
+        <span class="stat-label">Partners per deal</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <span class="stat-num">100%</span>
+        <span class="stat-label">Allocation accuracy</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <span class="stat-num">Real-time</span>
+        <span class="stat-label">Balance updates</span>
+      </div>
+    </div>
+
+    <!-- MARQUEE -->
+    <div class="marquee-wrap">
+      <div class="marquee-track">
+        <!-- repeated twice for seamless loop -->
+        <span class="marquee-item"><span class="tag">Multi-partner splits</span><span class="marquee-sep"></span></span>
+        <span class="marquee-item">Custom percentage allocation<span class="marquee-sep"></span></span>
+        <span class="marquee-item"><span class="tag">Real-time ledger</span><span class="marquee-sep"></span></span>
+        <span class="marquee-item">Investment tracking per deal<span class="marquee-sep"></span></span>
+        <span class="marquee-item"><span class="tag">Profit distribution</span><span class="marquee-sep"></span></span>
+        <span class="marquee-item">Edit returns on receipt<span class="marquee-sep"></span></span>
+        <span class="marquee-item"><span class="tag">Partner dashboards</span><span class="marquee-sep"></span></span>
+        <span class="marquee-item">Full accounting history<span class="marquee-sep"></span></span>
+        <span class="marquee-item"><span class="tag">Verified settlements</span><span class="marquee-sep"></span></span>
+        <span class="marquee-item">Transparent capital flow<span class="marquee-sep"></span></span>
+        <!-- duplicate -->
+        <span class="marquee-item"><span class="tag">Multi-partner splits</span><span class="marquee-sep"></span></span>
+        <span class="marquee-item">Custom percentage allocation<span class="marquee-sep"></span></span>
+        <span class="marquee-item"><span class="tag">Real-time ledger</span><span class="marquee-sep"></span></span>
+        <span class="marquee-item">Investment tracking per deal<span class="marquee-sep"></span></span>
+        <span class="marquee-item"><span class="tag">Profit distribution</span><span class="marquee-sep"></span></span>
+        <span class="marquee-item">Edit returns on receipt<span class="marquee-sep"></span></span>
+        <span class="marquee-item"><span class="tag">Partner dashboards</span><span class="marquee-sep"></span></span>
+        <span class="marquee-item">Full accounting history<span class="marquee-sep"></span></span>
+        <span class="marquee-item"><span class="tag">Verified settlements</span><span class="marquee-sep"></span></span>
+        <span class="marquee-item">Transparent capital flow<span class="marquee-sep"></span></span>
+      </div>
+    </div>
+
+  </section>
+
+</body>
+</html>
