@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Verdant — Partners</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --black:       #080b08;
+      --green-deep:  #0b1f0d;
+      --green-dark:  #0f2411;
+      --green-mid:   #1a4020;
+      --green-vivid: #2d7a3a;
+      --green-glow:  #3aab4a;
+      --green-pale:  #a8d5ad;
+      --white:       #e8ede9;
+      --muted:       #5a7a5e;
+      --border:      rgba(45,122,58,0.16);
+      --border-h:    rgba(45,122,58,0.35);
+      --card-bg:     rgba(11,31,13,0.7);
+      --input-bg:    rgba(18,43,20,0.4);
+      --sidebar-w:   220px;
+      --error:       #c0392b;
+    }
+
+    html, body { height: 100%; background: var(--black); color: var(--white); font-family: 'DM Mono', monospace; overflow: hidden; }
+
+    body::before {
+      content:''; position:fixed; inset:0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+      opacity:0.03; pointer-events:none; z-index:9999;
+    }
+
+    .app { display:flex; height:100vh; }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: var(--sidebar-w); flex-shrink:0;
+      background:var(--green-dark); border-right:1px solid var(--border);
+      display:flex; flex-direction:column; position:relative; z-index:10;
+    }
+    .sidebar-logo {
+      padding:28px 24px 24px; border-bottom:1px solid var(--border);
+      font-family:'Cormorant Garamond',serif; font-size:1.3rem; font-weight:600;
+      letter-spacing:0.06em; display:flex; align-items:center; gap:8px; color:var(--white);
+    }
+    .logo-dot { width:7px; height:7px; border-radius:50%; background:var(--green-glow); box-shadow:0 0 8px var(--green-glow); animation:pulse 2.4s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;box-shadow:0 0 8px var(--green-glow);}50%{opacity:.4;box-shadow:0 0 3px var(--green-glow);} }
+    .sidebar-nav { padding:20px 12px; flex:1; }
+    .nav-label { font-size:0.55rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--muted); padding:0 12px; margin-bottom:8px; margin-top:16px; }
+    .nav-label:first-child { margin-top:0; }
+    .nav-item {
+      display:flex; align-items:center; gap:10px; padding:10px 12px; font-size:0.65rem;
+      letter-spacing:0.08em; color:var(--muted); cursor:pointer; border-radius:2px;
+      transition:background .2s,color .2s; border:1px solid transparent;
+      text-decoration:none; margin-bottom:2px;
+    }
+    .nav-item svg { width:14px; height:14px; flex-shrink:0; }
+    .nav-item:hover { background:rgba(45,122,58,.1); color:var(--white); }
+    .nav-item.active { background:rgba(45,122,58,.15); color:var(--green-pale); border-color:var(--border); }
+    .sidebar-footer { padding:20px 24px; border-top:1px solid var(--border); font-size:0.6rem; color:var(--muted); }
+    .sidebar-user { display:flex; align-items:center; gap:10px; }
+    .user-avatar { width:28px; height:28px; background:var(--green-mid); border:1px solid var(--border-h); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.65rem; color:var(--green-pale); }
+    .user-info { flex:1; overflow:hidden; }
+    .user-name { color:var(--white); font-size:0.65rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .user-role { color:var(--muted); font-size:0.55rem; margin-top:2px; letter-spacing:0.08em; text-transform:uppercase; }
+
+    /* ── MAIN ── */
+    .main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+    .topbar {
+      height:60px; flex-shrink:0; border-bottom:1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between;
+      padding:0 32px; background:rgba(8,11,8,.6); backdrop-filter:blur(10px);
+    }
+    .topbar-title { font-family:'Cormorant Garamond',serif; font-size:1.15rem; font-weight:400; color:var(--white); letter-spacing:0.04em; }
+    .topbar-title span { color:var(--muted); font-size:0.9rem; }
+
+    .add-partner-top-btn {
+      font-family:'DM Mono',monospace; font-size:0.65rem; letter-spacing:0.14em; text-transform:uppercase;
+      background:var(--green-vivid); color:var(--black); border:none; padding:9px 22px; cursor:pointer;
+      font-weight:500; position:relative; overflow:hidden; transition:background .3s;
+      display:flex; align-items:center; gap:8px;
+    }
+    .add-partner-top-btn::after { content:''; position:absolute; inset:0; background:var(--green-glow); opacity:0; transition:opacity .3s; }
+    .add-partner-top-btn:hover::after { opacity:1; }
+    .add-partner-top-btn span { position:relative; z-index:1; }
+
+    /* ── BODY ── */
+    .body-wrap { flex:1; display:flex; overflow:hidden; position:relative; }
+
+    /* ── ADD PARTNER PANEL ── */
+    .add-panel {
+      width:320px; flex-shrink:0;
+      border-right:1px solid var(--border);
+      background:var(--green-dark);
+      padding:28px 26px;
+      overflow-y:auto; overflow-x:hidden;
+      transition: width 0.35s cubic-bezier(0.77,0,0.175,1), padding 0.35s, opacity 0.25s;
+    }
+    .add-panel.collapsed { width:0; padding:0; opacity:0; overflow:hidden; border-right:none; }
+
+    .panel-toggle {
+      position:absolute; top:50%; transform:translateY(-50%); z-index:20;
+      display:flex; align-items:center; justify-content:center;
+      width:20px; height:56px; background:var(--green-dark);
+      border:1px solid var(--border); border-left:none; cursor:pointer;
+      transition:left 0.35s cubic-bezier(0.77,0,0.175,1), background 0.2s;
+      color:var(--muted); left:0;
+    }
+    .panel-toggle:hover { background:var(--green-mid); color:var(--green-pale); }
+    .panel-toggle svg { width:10px; height:10px; transition:transform 0.3s; }
+    .panel-toggle.open svg { transform:rotate(180deg); }
+
+    .panel-heading { font-family:'Cormorant Garamond',serif; font-size:1.4rem; font-weight:300; color:var(--white); margin-bottom:4px; }
+    .panel-sub { font-size:0.6rem; color:var(--muted); letter-spacing:0.08em; margin-bottom:26px; }
+
+    .sect-divider { font-size:0.55rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:18px; margin-top:22px; }
+
+    .field { margin-bottom:15px; }
+    .field label { display:block; font-size:0.58rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--muted); margin-bottom:7px; }
+    .field input, .field select, .field textarea {
+      width:100%; background:var(--input-bg); border:1px solid var(--border); color:var(--white);
+      font-family:'DM Mono',monospace; font-size:0.75rem; padding:11px 14px; outline:none;
+      transition:border-color .25s, background .25s; letter-spacing:0.04em;
+      -webkit-appearance:none; appearance:none; resize:none;
+    }
+    .field input::placeholder, .field textarea::placeholder { color:rgba(90,122,94,.45); }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color:var(--green-vivid); background:rgba(18,43,20,.55); }
+    .field select option { background:#0f2411; }
+    .field textarea { height:70px; line-height:1.6; }
+
+    /* avatar picker */
+    .avatar-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+    .av-swatch {
+      width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+      font-size:0.65rem; font-weight:500; cursor:pointer; border:2px solid transparent;
+      transition:border-color .2s; letter-spacing:0;
+    }
+    .av-swatch.selected { border-color:var(--green-glow); }
+    .av-swatch:hover { border-color:var(--green-mid); }
+
+    .submit-btn {
+      width:100%; font-family:'DM Mono',monospace; font-size:0.68rem; letter-spacing:0.16em;
+      text-transform:uppercase; font-weight:500; background:var(--green-vivid); color:var(--black);
+      border:none; padding:13px; cursor:pointer; position:relative; overflow:hidden; margin-top:8px;
+    }
+    .submit-btn::after { content:''; position:absolute; inset:0; background:var(--green-glow); opacity:0; transition:opacity .3s; }
+    .submit-btn:hover::after { opacity:1; }
+    .submit-btn span { position:relative; z-index:1; }
+
+    .form-error { font-size:0.6rem; color:var(--error); margin-top:8px; display:none; }
+    .form-error.show { display:block; }
+
+    /* ── PARTNERS MAIN ── */
+    .partners-main { flex:1; overflow-y:auto; padding:28px 32px; position:relative; }
+
+    /* stats */
+    .stats-strip { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:32px; }
+    .stat-card {
+      background:var(--card-bg); border:1px solid var(--border); padding:18px 20px; position:relative;
+      animation:fadeUp .6s cubic-bezier(.23,1,.32,1) both;
+    }
+    .stat-card::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,var(--green-vivid),transparent); }
+    .stat-label-sm { font-size:0.55rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--muted); margin-bottom:10px; }
+    .stat-val { font-family:'Cormorant Garamond',serif; font-size:1.7rem; font-weight:400; color:var(--white); line-height:1; }
+    .stat-sub { font-size:0.58rem; color:var(--muted); margin-top:4px; letter-spacing:0.06em; }
+
+    @keyframes fadeUp { from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);} }
+
+    /* section header */
+    .section-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+    .section-title { font-family:'Cormorant Garamond',serif; font-size:1.1rem; font-weight:400; color:var(--white); letter-spacing:0.04em; }
+
+    /* search + filter bar */
+    .filter-bar { display:flex; gap:12px; margin-bottom:24px; align-items:center; }
+    .search-wrap { position:relative; flex:1; }
+    .search-wrap svg { position:absolute; left:12px; top:50%; transform:translateY(-50%); width:13px; height:13px; color:var(--muted); }
+    .search-wrap input {
+      width:100%; background:var(--input-bg); border:1px solid var(--border); color:var(--white);
+      font-family:'DM Mono',monospace; font-size:0.72rem; padding:10px 14px 10px 36px; outline:none;
+      transition:border-color .2s; letter-spacing:0.04em;
+    }
+    .search-wrap input::placeholder { color:rgba(90,122,94,.4); }
+    .search-wrap input:focus { border-color:var(--green-vivid); }
+
+    .sort-select {
+      background:var(--input-bg); border:1px solid var(--border); color:var(--muted);
+      font-family:'DM Mono',monospace; font-size:0.65rem; padding:10px 14px; outline:none;
+      cursor:pointer; letter-spacing:0.06em; -webkit-appearance:none; appearance:none;
+      transition:border-color .2s;
+    }
+    .sort-select:focus { border-color:var(--green-vivid); }
+    .sort-select option { background:#0f2411; }
+
+    /* partner grid */
+    .partners-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(340px,1fr)); gap:16px; }
+
+    /* partner card */
+    .partner-card {
+      background:var(--card-bg); border:1px solid var(--border); overflow:hidden;
+      transition:border-color .25s; animation:fadeUp .5s cubic-bezier(.23,1,.32,1) both;
+      display:flex; flex-direction:column;
+    }
+    .partner-card:hover { border-color:var(--border-h); }
+
+    .pc-header {
+      padding:18px 22px 14px; border-bottom:1px solid var(--border);
+      display:flex; align-items:center; gap:14px;
+    }
+    .pc-avatar {
+      width:40px; height:40px; border-radius:50%; flex-shrink:0;
+      display:flex; align-items:center; justify-content:center;
+      font-size:0.85rem; font-weight:500; letter-spacing:0;
+      border:1px solid rgba(255,255,255,.08);
+    }
+    .pc-info { flex:1; min-width:0; }
+    .pc-name { font-family:'Cormorant Garamond',serif; font-size:1.15rem; font-weight:400; color:var(--white); }
+    .pc-role { font-size:0.58rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); margin-top:2px; }
+    .pc-contact { font-size:0.6rem; color:var(--muted); margin-top:4px; letter-spacing:0.04em; }
+
+    .pc-actions { display:flex; flex-direction:column; gap:5px; }
+    .pc-edit-btn, .pc-delete-btn {
+      font-family:'DM Mono',monospace; font-size:0.55rem; letter-spacing:0.1em; text-transform:uppercase;
+      background:transparent; border:1px solid var(--border); padding:4px 10px; cursor:pointer; transition:.2s;
+    }
+    .pc-edit-btn { color:var(--muted); }
+    .pc-edit-btn:hover { border-color:var(--green-mid); color:var(--green-pale); }
+    .pc-delete-btn { color:rgba(192,57,43,.6); border-color:rgba(192,57,43,.2); }
+    .pc-delete-btn:hover { background:rgba(192,57,43,.1); color:var(--error); border-color:rgba(192,57,43,.5); }
+
+    /* summary row */
+    .pc-summary {
+      display:grid; grid-template-columns:repeat(3,1fr);
+      border-bottom:1px solid var(--border);
+    }
+    .pc-sum-item { padding:12px 16px; border-right:1px solid var(--border); }
+    .pc-sum-item:last-child { border-right:none; }
+    .pc-sum-label { font-size:0.52rem; letter-spacing:0.16em; text-transform:uppercase; color:var(--muted); margin-bottom:5px; }
+    .pc-sum-val { font-family:'Cormorant Garamond',serif; font-size:1.15rem; font-weight:400; color:var(--white); }
+    .pc-sum-val.green { color:var(--green-pale); }
+
+    /* investments list inside card */
+    .pc-deals { padding:12px 0; }
+    .pc-deals-label { font-size:0.52rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--muted); padding:0 22px; margin-bottom:10px; display:flex; justify-content:space-between; }
+
+    .pc-deal-row {
+      display:flex; align-items:center; gap:10px; padding:8px 22px;
+      border-bottom:1px solid rgba(45,122,58,.06); transition:background .15s;
+    }
+    .pc-deal-row:last-child { border-bottom:none; }
+    .pc-deal-row:hover { background:rgba(45,122,58,.04); }
+    .pc-deal-dot { width:5px; height:5px; border-radius:50%; background:var(--green-mid); border:1px solid var(--green-vivid); flex-shrink:0; }
+    .pc-deal-name { flex:1; font-size:0.67rem; color:var(--white); letter-spacing:0.03em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .pc-deal-pct { font-size:0.62rem; color:var(--green-glow); background:rgba(58,171,74,.08); border:1px solid rgba(58,171,74,.15); padding:2px 8px; flex-shrink:0; }
+    .pc-deal-amt { font-size:0.62rem; color:var(--muted); text-align:right; min-width:80px; }
+    .pc-deal-ret { font-size:0.62rem; text-align:right; min-width:80px; }
+    .pc-deal-ret.pos { color:var(--green-pale); }
+    .pc-deal-ret.nil { color:var(--muted); }
+
+    /* notes section */
+    .pc-notes { padding:10px 22px 14px; border-top:1px solid var(--border); }
+    .pc-notes-label { font-size:0.52rem; letter-spacing:0.16em; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+    .pc-notes-text { font-size:0.66rem; color:var(--muted); line-height:1.7; font-style:italic; }
+
+    /* empty */
+    .empty-state { text-align:center; padding:80px 40px; border:1px dashed var(--border); color:var(--muted); grid-column:1/-1; }
+    .empty-state-icon { font-size:2.2rem; margin-bottom:14px; opacity:.4; }
+    .empty-state-title { font-family:'Cormorant Garamond',serif; font-size:1.3rem; font-weight:300; color:var(--white); margin-bottom:8px; }
+    .empty-state-sub { font-size:0.65rem; letter-spacing:0.06em; line-height:1.8; }
+
+    /* modal overlay for edit */
+    .modal-overlay {
+      position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:500;
+      display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px);
+      opacity:0; pointer-events:none; transition:opacity .25s;
+    }
+    .modal-overlay.show { opacity:1; pointer-events:all; }
+    .modal {
+      background:var(--green-dark); border:1px solid var(--border-h);
+      width:380px; max-height:80vh; overflow-y:auto; padding:28px;
+      transform:translateY(20px); transition:transform .3s cubic-bezier(.23,1,.32,1);
+    }
+    .modal-overlay.show .modal { transform:translateY(0); }
+    .modal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:22px; }
+    .modal-title { font-family:'Cormorant Garamond',serif; font-size:1.35rem; font-weight:300; color:var(--white); }
+    .modal-close {
+      background:transparent; border:none; color:var(--muted); cursor:pointer;
+      font-size:1.2rem; line-height:1; transition:color .2s;
+    }
+    .modal-close:hover { color:var(--white); }
+
+    /* toast */
+    .toast { position:fixed; bottom:28px; right:28px; z-index:999; background:var(--green-dark); border:1px solid var(--green-mid); padding:14px 20px; font-size:0.65rem; letter-spacing:0.08em; color:var(--green-pale); transform:translateY(80px); opacity:0; transition:transform .35s cubic-bezier(.23,1,.32,1),opacity .35s; pointer-events:none; }
+    .toast.show { transform:translateY(0); opacity:1; }
+
+    ::-webkit-scrollbar { width:4px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:var(--green-mid); border-radius:99px; }
+
+    .section-count { font-size:0.6rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); background:var(--green-dark); border:1px solid var(--border); padding:4px 12px; }
+  </style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-dot"></div>
+      Verdant
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-label">Workspace</div>
+      <a href="dashboard.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Investments
+      </a>
+      <a href="partners.html" class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Partners
+      </a>
+      <a href="#" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Ledger
+      </a>
+      <div class="nav-label">Account</div>
+      <a href="#" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+        Settings
+      </a>
+      <a href="auth.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign Out
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="user-avatar">AK</div>
+        <div class="user-info">
+          <div class="user-name">Ali Khan</div>
+          <div class="user-role">Owner</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">Partners <span>/ Directory</span></div>
+      <button class="add-partner-top-btn" onclick="toggleAddPanel()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span id="add-btn-label">Add Partner</span>
+      </button>
+    </div>
+
+    <div class="body-wrap">
+
+      <!-- toggle tab -->
+      <button class="panel-toggle" id="panel-toggle" onclick="toggleAddPanel()" title="Toggle panel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+
+      <!-- ── ADD PARTNER PANEL ── -->
+      <div class="add-panel collapsed" id="add-panel">
+        <div class="panel-heading">Add Partner</div>
+        <div class="panel-sub">Register a new partner to your network</div>
+
+        <div class="sect-divider">Identity</div>
+
+        <!-- avatar color picker -->
+        <div class="field">
+          <label>Avatar Color</label>
+          <div class="avatar-row" id="avatar-row">
+            <div class="av-swatch selected" data-color="#1a4020" data-text="#a8d5ad" style="background:#1a4020;color:#a8d5ad" onclick="selectAvatar(this)">A</div>
+            <div class="av-swatch" data-color="#1a2540" data-text="#a8c5e8" style="background:#1a2540;color:#a8c5e8" onclick="selectAvatar(this)">A</div>
+            <div class="av-swatch" data-color="#401a1a" data-text="#e8a8a8" style="background:#401a1a;color:#e8a8a8" onclick="selectAvatar(this)">A</div>
+            <div class="av-swatch" data-color="#2a1a40" data-text="#c8a8e8" style="background:#2a1a40;color:#c8a8e8" onclick="selectAvatar(this)">A</div>
+            <div class="av-swatch" data-color="#401a30" data-text="#e8a8d0" style="background:#401a30;color:#e8a8d0" onclick="selectAvatar(this)">A</div>
+            <div class="av-swatch" data-color="#2a3010" data-text="#c8d890" style="background:#2a3010;color:#c8d890" onclick="selectAvatar(this)">A</div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Full Name</label>
+          <input type="text" id="p-name" placeholder="e.g. Sara Ahmed"/>
+        </div>
+        <div class="field">
+          <label>Role / Title</label>
+          <input type="text" id="p-role" placeholder="e.g. Silent Investor"/>
+        </div>
+
+        <div class="sect-divider">Contact</div>
+
+        <div class="field">
+          <label>Phone / WhatsApp</label>
+          <input type="text" id="p-phone" placeholder="+92 300 0000000"/>
+        </div>
+        <div class="field">
+          <label>Email (Optional)</label>
+          <input type="email" id="p-email" placeholder="partner@email.com"/>
+        </div>
+
+        <div class="sect-divider">Notes</div>
+        <div class="field">
+          <label>Internal Notes</label>
+          <textarea id="p-notes" placeholder="Any relevant details about this partner..."></textarea>
+        </div>
+
+        <div class="form-error" id="p-error"></div>
+        <button class="submit-btn" onclick="savePartner()"><span>Add Partner →</span></button>
+      </div>
+
+      <!-- ── PARTNERS MAIN ── -->
+      <div class="partners-main">
+
+        <!-- stats -->
+        <div class="stats-strip">
+          <div class="stat-card">
+            <div class="stat-label-sm">Total Partners</div>
+            <div class="stat-val" id="ps-count">0</div>
+            <div class="stat-sub">registered</div>
+          </div>
+          <div class="stat-card" style="animation-delay:.08s">
+            <div class="stat-label-sm">Combined Invested</div>
+            <div class="stat-val" id="ps-invested">PKR 0</div>
+            <div class="stat-sub">across all deals</div>
+          </div>
+          <div class="stat-card" style="animation-delay:.16s">
+            <div class="stat-label-sm">Combined Returned</div>
+            <div class="stat-val" id="ps-returned">PKR 0</div>
+            <div class="stat-sub">distributed to date</div>
+          </div>
+          <div class="stat-card" style="animation-delay:.24s">
+            <div class="stat-label-sm">Avg. Deal Share</div>
+            <div class="stat-val" id="ps-avg">—</div>
+            <div class="stat-sub">per investment</div>
+          </div>
+        </div>
+
+        <!-- filter row -->
+        <div class="filter-bar">
+          <div class="search-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="search-input" placeholder="Search partners..." oninput="renderPartners()"/>
+          </div>
+          <select class="sort-select" id="sort-select" onchange="renderPartners()">
+            <option value="name">Sort: Name</option>
+            <option value="invested">Sort: Most Invested</option>
+            <option value="returned">Sort: Most Returned</option>
+            <option value="deals">Sort: Most Deals</option>
+          </select>
+        </div>
+
+        <div class="section-header">
+          <div class="section-title">Partner Directory</div>
+          <div class="section-count" id="p-count-badge">0 partners</div>
+        </div>
+
+        <div class="partners-grid" id="partners-grid">
+          <!-- filled by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- edit modal -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Edit Partner</div>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+
+    <div class="field">
+      <label>Full Name</label>
+      <input type="text" id="edit-name"/>
+    </div>
+    <div class="field">
+      <label>Role / Title</label>
+      <input type="text" id="edit-role"/>
+    </div>
+    <div class="field">
+      <label>Phone / WhatsApp</label>
+      <input type="text" id="edit-phone"/>
+    </div>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="edit-email"/>
+    </div>
+    <div class="field">
+      <label>Notes</label>
+      <textarea id="edit-notes"></textarea>
+    </div>
+
+    <!-- avatar picker in modal -->
+    <div class="field">
+      <label>Avatar Color</label>
+      <div class="avatar-row" id="edit-avatar-row">
+        <div class="av-swatch selected" data-color="#1a4020" data-text="#a8d5ad" style="background:#1a4020;color:#a8d5ad" onclick="selectEditAvatar(this)">A</div>
+        <div class="av-swatch" data-color="#1a2540" data-text="#a8c5e8" style="background:#1a2540;color:#a8c5e8" onclick="selectEditAvatar(this)">A</div>
+        <div class="av-swatch" data-color="#401a1a" data-text="#e8a8a8" style="background:#401a1a;color:#e8a8a8" onclick="selectEditAvatar(this)">A</div>
+        <div class="av-swatch" data-color="#2a1a40" data-text="#c8a8e8" style="background:#2a1a40;color:#c8a8e8" onclick="selectEditAvatar(this)">A</div>
+        <div class="av-swatch" data-color="#401a30" data-text="#e8a8d0" style="background:#401a30;color:#e8a8d0" onclick="selectEditAvatar(this)">A</div>
+        <div class="av-swatch" data-color="#2a3010" data-text="#c8d890" style="background:#2a3010;color:#c8d890" onclick="selectEditAvatar(this)">A</div>
+      </div>
+    </div>
+
+    <button class="submit-btn" onclick="saveEdit()"><span>Save Changes →</span></button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── STATE ──
+  let partners = [];
+  let investments = [];
+  let editingId = null;
+  let panelOpen = false;
+
+  const AVATAR_COLORS = [
+    { bg:'#1a4020', text:'#a8d5ad' },
+    { bg:'#1a2540', text:'#a8c5e8' },
+    { bg:'#401a1a', text:'#e8a8a8' },
+    { bg:'#2a1a40', text:'#c8a8e8' },
+    { bg:'#401a30', text:'#e8a8d0' },
+    { bg:'#2a3010', text:'#c8d890' },
+  ];
+
+  let selectedAvatar = AVATAR_COLORS[0];
+  let editSelectedAvatar = AVATAR_COLORS[0];
+
+  // ── INIT ──
+  document.addEventListener('DOMContentLoaded', () => {
+    loadData();
+    renderPartners();
+    updateStats();
+  });
+
+  function loadData() {
+    try {
+      const inv = localStorage.getItem('verdant_investments');
+      if (inv) investments = JSON.parse(inv);
+      const pts = localStorage.getItem('verdant_partners');
+      if (pts) partners = JSON.parse(pts);
+    } catch(e) {}
+  }
+
+  function saveData() {
+    try { localStorage.setItem('verdant_partners', JSON.stringify(partners)); } catch(e) {}
+  }
+
+  // ── PANEL TOGGLE ──
+  function toggleAddPanel() {
+    panelOpen = !panelOpen;
+    const panel = document.getElementById('add-panel');
+    const toggle = document.getElementById('panel-toggle');
+    const label = document.getElementById('add-btn-label');
+    panel.classList.toggle('collapsed', !panelOpen);
+    toggle.classList.toggle('open', panelOpen);
+    toggle.style.left = panelOpen ? '320px' : '0px';
+    label.textContent = panelOpen ? 'Close' : 'Add Partner';
+    if (panelOpen) setTimeout(() => document.getElementById('p-name').focus(), 360);
+  }
+
+  // ── AVATAR ──
+  function selectAvatar(el) {
+    document.querySelectorAll('#avatar-row .av-swatch').forEach(s => s.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedAvatar = { bg: el.dataset.color, text: el.dataset.text };
+    // update letter
+    const name = document.getElementById('p-name').value.trim();
+    el.textContent = name ? name[0].toUpperCase() : 'A';
+  }
+
+  function selectEditAvatar(el) {
+    document.querySelectorAll('#edit-avatar-row .av-swatch').forEach(s => s.classList.remove('selected'));
+    el.classList.add('selected');
+    editSelectedAvatar = { bg: el.dataset.color, text: el.dataset.text };
+  }
+
+  document.getElementById('p-name').addEventListener('input', function() {
+    const sel = document.querySelector('#avatar-row .av-swatch.selected');
+    if (sel) sel.textContent = this.value ? this.value[0].toUpperCase() : 'A';
+  });
+
+  // ── SAVE PARTNER ──
+  function savePartner() {
+    const name  = document.getElementById('p-name').value.trim();
+    const role  = document.getElementById('p-role').value.trim();
+    const phone = document.getElementById('p-phone').value.trim();
+    const email = document.getElementById('p-email').value.trim();
+    const notes = document.getElementById('p-notes').value.trim();
+    const errEl = document.getElementById('p-error');
+
+    if (!name) { errEl.textContent = 'Name is required.'; errEl.classList.add('show'); return; }
+    errEl.classList.remove('show');
+
+    const partner = {
+      id: Date.now(),
+      name, role, phone, email, notes,
+      avatarBg: selectedAvatar.bg,
+      avatarText: selectedAvatar.text,
+      createdAt: new Date().toISOString()
+    };
+
+    partners.unshift(partner);
+    saveData();
+    renderPartners();
+    updateStats();
+    showToast('Partner added');
+
+    // reset
+    document.getElementById('p-name').value = '';
+    document.getElementById('p-role').value = '';
+    document.getElementById('p-phone').value = '';
+    document.getElementById('p-email').value = '';
+    document.getElementById('p-notes').value = '';
+  }
+
+  // ── RENDER ──
+  function renderPartners() {
+    const grid = document.getElementById('partners-grid');
+    const badge = document.getElementById('p-count-badge');
+    const search = document.getElementById('search-input').value.toLowerCase();
+    const sort = document.getElementById('sort-select').value;
+
+    // combine: registered partners + partners inferred from investments
+    const allNames = new Set(partners.map(p => p.name.toLowerCase()));
+    const syntheticPartners = [];
+    investments.forEach(inv => {
+      inv.partners.forEach(ip => {
+        if (!allNames.has(ip.name.toLowerCase())) {
+          syntheticPartners.push({
+            id: 'syn-' + ip.name,
+            name: ip.name, role: 'Investor', phone:'', email:'', notes:'',
+            avatarBg: AVATAR_COLORS[Math.abs(hashStr(ip.name)) % AVATAR_COLORS.length].bg,
+            avatarText: AVATAR_COLORS[Math.abs(hashStr(ip.name)) % AVATAR_COLORS.length].text,
+            synthetic: true
+          });
+          allNames.add(ip.name.toLowerCase());
+        }
+      });
+    });
+
+    const all = [...partners, ...syntheticPartners];
+
+    // filter
+    let filtered = all.filter(p => p.name.toLowerCase().includes(search) || (p.role||'').toLowerCase().includes(search));
+
+    // compute deal stats for sorting
+    filtered = filtered.map(p => {
+      const stats = getPartnerStats(p.name);
+      return { ...p, _invested: stats.totalInvested, _returned: stats.totalReturned, _deals: stats.deals.length };
+    });
+
+    // sort
+    if (sort === 'name') filtered.sort((a,b) => a.name.localeCompare(b.name));
+    if (sort === 'invested') filtered.sort((a,b) => b._invested - a._invested);
+    if (sort === 'returned') filtered.sort((a,b) => b._returned - a._returned);
+    if (sort === 'deals') filtered.sort((a,b) => b._deals - a._deals);
+
+    badge.textContent = filtered.length + (filtered.length === 1 ? ' partner' : ' partners');
+
+    if (filtered.length === 0) {
+      grid.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">◈</div>
+          <div class="empty-state-title">No partners yet</div>
+          <div class="empty-state-sub">Add your first partner using the panel,<br>or create investments with partner names.</div>
+        </div>`;
+      return;
+    }
+
+    grid.innerHTML = '';
+    filtered.forEach((p, idx) => {
+      const stats = getPartnerStats(p.name);
+      const initials = p.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
+      const card = document.createElement('div');
+      card.className = 'partner-card';
+      card.style.animationDelay = (idx * 0.04) + 's';
+
+      const dealsHTML = stats.deals.length > 0
+        ? stats.deals.map(d => `
+            <div class="pc-deal-row">
+              <div class="pc-deal-dot"></div>
+              <div class="pc-deal-name">${d.invName}</div>
+              <div class="pc-deal-pct">${d.pct}%</div>
+              <div class="pc-deal-amt">${fmtPKR(d.invested)}</div>
+              <div class="pc-deal-ret ${d.returned > 0 ? 'pos' : 'nil'}">${d.returned > 0 ? fmtPKR(d.returned) : '—'}</div>
+            </div>`).join('')
+        : '<div style="padding:10px 22px;font-size:0.62rem;color:var(--muted);">No investments linked yet.</div>';
+
+      const notesHTML = p.notes
+        ? `<div class="pc-notes"><div class="pc-notes-label">Notes</div><div class="pc-notes-text">${p.notes}</div></div>`
+        : '';
+
+      const contactLine = [p.phone, p.email].filter(Boolean).join(' · ');
+
+      card.innerHTML = `
+        <div class="pc-header">
+          <div class="pc-avatar" style="background:${p.avatarBg};color:${p.avatarText}">${initials}</div>
+          <div class="pc-info">
+            <div class="pc-name">${p.name}</div>
+            ${p.role ? `<div class="pc-role">${p.role}</div>` : ''}
+            ${contactLine ? `<div class="pc-contact">${contactLine}</div>` : ''}
+          </div>
+          <div class="pc-actions">
+            ${!p.synthetic ? `<button class="pc-edit-btn" onclick="openEditModal('${p.id}')">Edit</button>` : ''}
+            ${!p.synthetic ? `<button class="pc-delete-btn" onclick="deletePartner('${p.id}')">Remove</button>` : ''}
+          </div>
+        </div>
+        <div class="pc-summary">
+          <div class="pc-sum-item">
+            <div class="pc-sum-label">Deals</div>
+            <div class="pc-sum-val">${stats.deals.length}</div>
+          </div>
+          <div class="pc-sum-item">
+            <div class="pc-sum-label">Invested</div>
+            <div class="pc-sum-val">${fmtPKR(stats.totalInvested)}</div>
+          </div>
+          <div class="pc-sum-item">
+            <div class="pc-sum-label">Returned</div>
+            <div class="pc-sum-val green">${stats.totalReturned > 0 ? fmtPKR(stats.totalReturned) : '—'}</div>
+          </div>
+        </div>
+        <div class="pc-deals">
+          <div class="pc-deals-label">
+            <span>Investment</span>
+            <span style="display:flex;gap:42px"><span>Share</span><span>Invested</span><span>Returned</span></span>
+          </div>
+          ${dealsHTML}
+        </div>
+        ${notesHTML}
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  // ── PARTNER STATS from investments ──
+  function getPartnerStats(name) {
+    const deals = [];
+    let totalInvested = 0, totalReturned = 0;
+    const nameLower = name.toLowerCase();
+    investments.forEach(inv => {
+      inv.partners.forEach(ip => {
+        if (ip.name.toLowerCase() === nameLower) {
+          const invested = (ip.pct / 100) * inv.total;
+          const returned = inv.received > 0 ? (ip.pct / 100) * inv.received : 0;
+          totalInvested += invested;
+          totalReturned += returned;
+          deals.push({ invName: inv.name, pct: ip.pct, invested, returned });
+        }
+      });
+    });
+    return { deals, totalInvested, totalReturned };
+  }
+
+  // ── STATS ──
+  function updateStats() {
+    const allNames = new Set();
+    investments.forEach(inv => inv.partners.forEach(p => allNames.add(p.name.toLowerCase())));
+    partners.forEach(p => allNames.add(p.name.toLowerCase()));
+
+    let totalInvested = 0, totalReturned = 0, totalPcts = [], dealCount = 0;
+    allNames.forEach(name => {
+      const s = getPartnerStats(name);
+      totalInvested += s.totalInvested;
+      totalReturned += s.totalReturned;
+      s.deals.forEach(d => { totalPcts.push(d.pct); dealCount++; });
+    });
+
+    const avgPct = dealCount > 0 ? (totalPcts.reduce((a,b)=>a+b,0)/totalPcts.length).toFixed(1)+'%' : '—';
+
+    document.getElementById('ps-count').textContent = allNames.size;
+    document.getElementById('ps-invested').textContent = fmtPKR(totalInvested);
+    document.getElementById('ps-returned').textContent = totalReturned > 0 ? fmtPKR(totalReturned) : '—';
+    document.getElementById('ps-avg').textContent = avgPct;
+  }
+
+  // ── EDIT ──
+  function openEditModal(id) {
+    const p = partners.find(x => x.id == id);
+    if (!p) return;
+    editingId = id;
+    document.getElementById('edit-name').value = p.name;
+    document.getElementById('edit-role').value = p.role || '';
+    document.getElementById('edit-phone').value = p.phone || '';
+    document.getElementById('edit-email').value = p.email || '';
+    document.getElementById('edit-notes').value = p.notes || '';
+
+    // sync avatar
+    editSelectedAvatar = { bg: p.avatarBg, text: p.avatarText };
+    document.querySelectorAll('#edit-avatar-row .av-swatch').forEach(s => {
+      s.classList.toggle('selected', s.dataset.color === p.avatarBg);
+    });
+
+    document.getElementById('edit-modal').classList.add('show');
+  }
+
+  function closeModal() { document.getElementById('edit-modal').classList.remove('show'); editingId = null; }
+
+  function saveEdit() {
+    const p = partners.find(x => x.id == editingId);
+    if (!p) return;
+    p.name     = document.getElementById('edit-name').value.trim() || p.name;
+    p.role     = document.getElementById('edit-role').value.trim();
+    p.phone    = document.getElementById('edit-phone').value.trim();
+    p.email    = document.getElementById('edit-email').value.trim();
+    p.notes    = document.getElementById('edit-notes').value.trim();
+    p.avatarBg = editSelectedAvatar.bg;
+    p.avatarText = editSelectedAvatar.text;
+    saveData();
+    renderPartners();
+    updateStats();
+    closeModal();
+    showToast('Partner updated');
+  }
+
+  function deletePartner(id) {
+    partners = partners.filter(p => p.id != id);
+    saveData();
+    renderPartners();
+    updateStats();
+    showToast('Partner removed');
+  }
+
+  // ── UTILS ──
+  function fmtPKR(n) {
+    if (!n) return 'PKR 0';
+    if (n >= 1_000_000) return 'PKR ' + (n/1_000_000).toFixed(2)+'M';
+    if (n >= 1_000) return 'PKR ' + (n/1_000).toFixed(1)+'K';
+    return 'PKR ' + n.toLocaleString();
+  }
+
+  function hashStr(s) {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+    return h;
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  // close modal on overlay click
+  document.getElementById('edit-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+</script>
+</body>
+</html>

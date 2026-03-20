@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Verdant — Ledger</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+    :root {
+      --black:       #080b08;
+      --green-dark:  #0f2411;
+      --green-mid:   #1a4020;
+      --green-vivid: #2d7a3a;
+      --green-glow:  #3aab4a;
+      --green-pale:  #a8d5ad;
+      --white:       #e8ede9;
+      --muted:       #5a7a5e;
+      --border:      rgba(45,122,58,0.16);
+      --border-h:    rgba(45,122,58,0.35);
+      --card-bg:     rgba(11,31,13,0.7);
+      --input-bg:    rgba(18,43,20,0.4);
+      --sidebar-w:   220px;
+      --error:       #c0392b;
+      --positive:    #3aab4a;
+      --negative:    #c0392b;
+    }
+
+    html, body { height:100%; background:var(--black); color:var(--white); font-family:'DM Mono',monospace; overflow:hidden; }
+
+    body::before {
+      content:''; position:fixed; inset:0;
+      background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+      opacity:0.03; pointer-events:none; z-index:9999;
+    }
+
+    .app { display:flex; height:100vh; }
+
+    /* ── SIDEBAR ── */
+    .sidebar { width:var(--sidebar-w); flex-shrink:0; background:var(--green-dark); border-right:1px solid var(--border); display:flex; flex-direction:column; z-index:10; }
+    .sidebar-logo { padding:28px 24px 24px; border-bottom:1px solid var(--border); font-family:'Cormorant Garamond',serif; font-size:1.3rem; font-weight:600; letter-spacing:0.06em; display:flex; align-items:center; gap:8px; color:var(--white); }
+    .logo-dot { width:7px; height:7px; border-radius:50%; background:var(--green-glow); box-shadow:0 0 8px var(--green-glow); animation:pulse 2.4s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;box-shadow:0 0 8px var(--green-glow);}50%{opacity:.4;box-shadow:0 0 3px var(--green-glow);} }
+    .sidebar-nav { padding:20px 12px; flex:1; }
+    .nav-label { font-size:0.55rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--muted); padding:0 12px; margin-bottom:8px; margin-top:16px; }
+    .nav-label:first-child { margin-top:0; }
+    .nav-item { display:flex; align-items:center; gap:10px; padding:10px 12px; font-size:0.65rem; letter-spacing:0.08em; color:var(--muted); cursor:pointer; border-radius:2px; transition:background .2s,color .2s; border:1px solid transparent; text-decoration:none; margin-bottom:2px; }
+    .nav-item svg { width:14px; height:14px; flex-shrink:0; }
+    .nav-item:hover { background:rgba(45,122,58,.1); color:var(--white); }
+    .nav-item.active { background:rgba(45,122,58,.15); color:var(--green-pale); border-color:var(--border); }
+    .sidebar-footer { padding:20px 24px; border-top:1px solid var(--border); }
+    .sidebar-user { display:flex; align-items:center; gap:10px; }
+    .user-avatar { width:28px; height:28px; background:var(--green-mid); border:1px solid var(--border-h); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.65rem; color:var(--green-pale); }
+    .user-info { flex:1; overflow:hidden; }
+    .user-name { color:var(--white); font-size:0.65rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .user-role { color:var(--muted); font-size:0.55rem; margin-top:2px; letter-spacing:0.08em; text-transform:uppercase; }
+
+    /* ── MAIN ── */
+    .main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+    .topbar { height:60px; flex-shrink:0; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; padding:0 32px; background:rgba(8,11,8,.6); backdrop-filter:blur(10px); }
+    .topbar-title { font-family:'Cormorant Garamond',serif; font-size:1.15rem; font-weight:400; color:var(--white); letter-spacing:0.04em; }
+    .topbar-title span { color:var(--muted); font-size:0.9rem; }
+    .topbar-right { display:flex; align-items:center; gap:12px; }
+
+    .export-btn {
+      font-family:'DM Mono',monospace; font-size:0.62rem; letter-spacing:0.12em; text-transform:uppercase;
+      background:transparent; color:var(--muted); border:1px solid var(--border);
+      padding:8px 18px; cursor:pointer; transition:border-color .2s, color .2s; display:flex; align-items:center; gap:7px;
+    }
+    .export-btn:hover { border-color:var(--green-mid); color:var(--green-pale); }
+    .export-btn svg { width:12px; height:12px; }
+
+    /* ── CONTENT WRAPPER ── */
+    .content { flex:1; overflow-y:auto; padding:28px 32px; display:flex; flex-direction:column; gap:28px; }
+
+    /* ── SUMMARY STRIP ── */
+    .summary-strip { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; }
+
+    .sum-card {
+      background:var(--card-bg); border:1px solid var(--border); padding:16px 18px; position:relative;
+      animation:fadeUp .5s cubic-bezier(.23,1,.32,1) both;
+    }
+    .sum-card::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,var(--green-vivid),transparent); }
+    .sum-label { font-size:0.52rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
+    .sum-val { font-family:'Cormorant Garamond',serif; font-size:1.5rem; font-weight:400; color:var(--white); line-height:1; }
+    .sum-val.green { color:var(--green-pale); }
+    .sum-val.red   { color:#e08080; }
+    .sum-sub { font-size:0.55rem; color:var(--muted); margin-top:4px; }
+
+    @keyframes fadeUp { from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);} }
+
+    /* ── FILTER BAR ── */
+    .filter-bar {
+      display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+      background:var(--card-bg); border:1px solid var(--border); padding:14px 18px;
+    }
+    .filter-label { font-size:0.55rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--muted); flex-shrink:0; }
+
+    .search-wrap { position:relative; flex:1; min-width:160px; }
+    .search-wrap svg { position:absolute; left:10px; top:50%; transform:translateY(-50%); width:12px; height:12px; color:var(--muted); pointer-events:none; }
+    .search-wrap input { width:100%; background:var(--input-bg); border:1px solid var(--border); color:var(--white); font-family:'DM Mono',monospace; font-size:0.7rem; padding:8px 12px 8px 30px; outline:none; transition:border-color .2s; letter-spacing:0.04em; }
+    .search-wrap input::placeholder { color:rgba(90,122,94,.4); }
+    .search-wrap input:focus { border-color:var(--green-vivid); }
+
+    .filter-select { background:var(--input-bg); border:1px solid var(--border); color:var(--muted); font-family:'DM Mono',monospace; font-size:0.62rem; padding:8px 12px; outline:none; cursor:pointer; letter-spacing:0.06em; -webkit-appearance:none; appearance:none; transition:border-color .2s; }
+    .filter-select:focus { border-color:var(--green-vivid); }
+    .filter-select option { background:#0f2411; }
+
+    .filter-chip {
+      font-family:'DM Mono',monospace; font-size:0.58rem; letter-spacing:0.1em; text-transform:uppercase;
+      padding:6px 14px; border:1px solid var(--border); cursor:pointer; transition:.2s; color:var(--muted); background:transparent;
+    }
+    .filter-chip.active { background:rgba(45,122,58,.15); border-color:var(--border-h); color:var(--green-pale); }
+    .filter-chip:hover { border-color:var(--green-mid); color:var(--green-pale); }
+
+    /* ── BODY SPLIT ── */
+    .ledger-split { display:flex; gap:20px; flex:1; min-height:0; }
+
+    /* ── LEDGER TABLE ── */
+    .ledger-section { flex:1; display:flex; flex-direction:column; min-width:0; }
+
+    .section-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+    .section-title { font-family:'Cormorant Garamond',serif; font-size:1.05rem; font-weight:400; color:var(--white); }
+    .record-count { font-size:0.58rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); background:var(--green-dark); border:1px solid var(--border); padding:3px 10px; }
+
+    .table-wrap { border:1px solid var(--border); overflow:hidden; }
+
+    .ledger-table { width:100%; border-collapse:collapse; }
+    .ledger-table thead tr { background:rgba(18,43,20,.6); border-bottom:1px solid var(--border); }
+    .ledger-table th {
+      font-size:0.52rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--muted);
+      padding:11px 16px; text-align:left; font-weight:400; white-space:nowrap;
+    }
+    .ledger-table th.right { text-align:right; }
+
+    .ledger-table tbody tr {
+      border-bottom:1px solid rgba(45,122,58,.07);
+      transition:background .15s; cursor:pointer;
+    }
+    .ledger-table tbody tr:last-child { border-bottom:none; }
+    .ledger-table tbody tr:hover { background:rgba(45,122,58,.05); }
+    .ledger-table tbody tr.expanded-parent { background:rgba(45,122,58,.06); border-bottom:none; }
+
+    .ledger-table td { padding:12px 16px; font-size:0.68rem; letter-spacing:0.03em; vertical-align:middle; }
+    .ledger-table td.right { text-align:right; }
+    .ledger-table td.center { text-align:center; }
+
+    /* investment name cell */
+    .td-inv { display:flex; align-items:center; gap:10px; }
+    .td-inv-icon {
+      width:28px; height:28px; border-radius:2px; background:var(--green-mid);
+      border:1px solid var(--border); display:flex; align-items:center; justify-content:center;
+      font-size:0.6rem; color:var(--green-pale); flex-shrink:0;
+    }
+    .td-inv-name { color:var(--white); font-size:0.7rem; }
+    .td-inv-cat { font-size:0.56rem; color:var(--muted); letter-spacing:0.08em; margin-top:2px; text-transform:uppercase; }
+
+    /* amounts */
+    .td-amount { font-family:'Cormorant Garamond',serif; font-size:1rem; color:var(--white); }
+    .td-amount.green { color:var(--green-pale); }
+    .td-amount.dim { color:var(--muted); }
+
+    /* status badge */
+    .badge { display:inline-flex; align-items:center; gap:5px; font-size:0.52rem; letter-spacing:0.12em; text-transform:uppercase; padding:3px 9px; }
+    .badge::before { content:''; width:4px; height:4px; border-radius:50%; background:currentColor; }
+    .badge.settled { background:rgba(58,171,74,.1); border:1px solid rgba(58,171,74,.2); color:var(--green-glow); }
+    .badge.pending { background:rgba(184,148,26,.08); border:1px solid rgba(184,148,26,.2); color:#d4ac2a; }
+    .badge.partial { background:rgba(100,130,200,.08); border:1px solid rgba(100,130,200,.2); color:#8ab0e8; }
+
+    /* expand chevron */
+    .expand-btn { background:none; border:none; color:var(--muted); cursor:pointer; padding:2px 4px; transition:transform .25s, color .2s; display:flex; align-items:center; }
+    .expand-btn svg { width:12px; height:12px; }
+    .expand-btn.open { transform:rotate(90deg); color:var(--green-pale); }
+
+    /* expanded partner breakdown rows */
+    .breakdown-row { display:none; }
+    .breakdown-row.show { display:table-row; }
+    .breakdown-row td { background:rgba(8,11,8,.4); padding:0; border-bottom:1px solid var(--border); }
+    .breakdown-inner { padding:0 16px 14px 54px; }
+    .breakdown-table { width:100%; border-collapse:collapse; }
+    .breakdown-table th { font-size:0.5rem; letter-spacing:0.16em; text-transform:uppercase; color:var(--muted); padding:8px 12px 6px; text-align:left; font-weight:400; border-bottom:1px solid rgba(45,122,58,.1); }
+    .breakdown-table th.right { text-align:right; }
+    .breakdown-table td { font-size:0.64rem; padding:7px 12px; color:var(--muted); border-bottom:1px solid rgba(45,122,58,.05); }
+    .breakdown-table td:first-child { color:var(--white); }
+    .breakdown-table td.right { text-align:right; }
+    .breakdown-table tr:last-child td { border-bottom:none; }
+    .breakdown-table .bd-pct { color:var(--green-glow); font-size:0.62rem; }
+    .breakdown-table .bd-ret { color:var(--green-pale); }
+    .breakdown-table .bd-nil { color:var(--muted); }
+
+    /* ── RIGHT SIDEBAR — PARTNER SUMMARY ── */
+    .partner-sidebar { width:280px; flex-shrink:0; display:flex; flex-direction:column; gap:14px; }
+
+    .ps-card { background:var(--card-bg); border:1px solid var(--border); padding:18px; animation:fadeUp .6s .1s cubic-bezier(.23,1,.32,1) both; }
+    .ps-card-title { font-size:0.55rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--muted); margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid var(--border); }
+
+    /* partner leaderboard */
+    .partner-lb { display:flex; flex-direction:column; gap:2px; }
+    .lb-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid rgba(45,122,58,.06); }
+    .lb-row:last-child { border-bottom:none; }
+    .lb-rank { font-size:0.58rem; color:var(--muted); width:16px; flex-shrink:0; text-align:center; }
+    .lb-avatar { width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.6rem; flex-shrink:0; border:1px solid rgba(255,255,255,.06); }
+    .lb-info { flex:1; min-width:0; }
+    .lb-name { font-size:0.66rem; color:var(--white); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .lb-deals { font-size:0.54rem; color:var(--muted); margin-top:1px; }
+    .lb-amt { font-family:'Cormorant Garamond',serif; font-size:0.95rem; color:var(--green-pale); text-align:right; flex-shrink:0; }
+
+    /* category breakdown */
+    .cat-list { display:flex; flex-direction:column; gap:10px; }
+    .cat-row { }
+    .cat-head { display:flex; justify-content:space-between; margin-bottom:5px; }
+    .cat-name { font-size:0.62rem; color:var(--white); }
+    .cat-pct-label { font-size:0.58rem; color:var(--muted); }
+    .cat-bar { height:3px; background:var(--green-dark); border-radius:99px; }
+    .cat-fill { height:100%; background:var(--green-vivid); border-radius:99px; transition:width .6s cubic-bezier(.23,1,.32,1); }
+    .cat-sub { font-size:0.56rem; color:var(--muted); margin-top:4px; }
+
+    /* timeline mini */
+    .timeline { display:flex; flex-direction:column; gap:0; }
+    .tl-item { display:flex; gap:12px; padding:10px 0; position:relative; }
+    .tl-item:not(:last-child)::before { content:''; position:absolute; left:5px; top:22px; bottom:-2px; width:1px; background:var(--border); }
+    .tl-dot { width:11px; height:11px; border-radius:50%; border:1px solid var(--green-vivid); background:var(--green-dark); flex-shrink:0; margin-top:3px; }
+    .tl-dot.filled { background:var(--green-vivid); }
+    .tl-body { flex:1; min-width:0; }
+    .tl-name { font-size:0.64rem; color:var(--white); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .tl-date { font-size:0.55rem; color:var(--muted); margin-top:2px; }
+    .tl-amt { font-size:0.62rem; color:var(--green-pale); margin-top:2px; }
+
+    /* empty */
+    .table-empty { padding:52px 20px; text-align:center; color:var(--muted); }
+    .table-empty-icon { font-size:2rem; margin-bottom:12px; opacity:.3; }
+    .table-empty-title { font-family:'Cormorant Garamond',serif; font-size:1.1rem; color:var(--white); margin-bottom:6px; font-weight:300; }
+    .table-empty-sub { font-size:0.62rem; line-height:1.7; }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width:4px; height:4px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:var(--green-mid); border-radius:99px; }
+
+    /* print / export table */
+    @media print {
+      .sidebar, .topbar, .filter-bar, .partner-sidebar, .export-btn { display:none !important; }
+      .content { padding:0; }
+      .ledger-split { display:block; }
+      html,body { overflow:auto; height:auto; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-dot"></div>
+      Verdant
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-label">Workspace</div>
+      <a href="dashboard.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Investments
+      </a>
+      <a href="partners.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Partners
+      </a>
+      <a href="ledger.html" class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Ledger
+      </a>
+      <div class="nav-label">Account</div>
+      <a href="#" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+        Settings
+      </a>
+      <a href="auth.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign Out
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="user-avatar">AK</div>
+        <div class="user-info">
+          <div class="user-name">Ali Khan</div>
+          <div class="user-role">Owner</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">Ledger <span>/ Full Audit Trail</span></div>
+      <div class="topbar-right">
+        <button class="export-btn" onclick="exportCSV()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export CSV
+        </button>
+        <button class="export-btn" onclick="window.print()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Print
+        </button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- summary strip -->
+      <div class="summary-strip" id="summary-strip">
+        <div class="sum-card">
+          <div class="sum-label">Total Capital</div>
+          <div class="sum-val" id="s-capital">PKR 0</div>
+          <div class="sum-sub">deployed across all deals</div>
+        </div>
+        <div class="sum-card" style="animation-delay:.06s">
+          <div class="sum-label">Total Returns</div>
+          <div class="sum-val green" id="s-returns">PKR 0</div>
+          <div class="sum-sub">received to date</div>
+        </div>
+        <div class="sum-card" style="animation-delay:.12s">
+          <div class="sum-label">Net P&L</div>
+          <div class="sum-val" id="s-pnl">PKR 0</div>
+          <div class="sum-sub">returns minus capital</div>
+        </div>
+        <div class="sum-card" style="animation-delay:.18s">
+          <div class="sum-label">Settled Deals</div>
+          <div class="sum-val" id="s-settled">0 / 0</div>
+          <div class="sum-sub">with returns received</div>
+        </div>
+        <div class="sum-card" style="animation-delay:.24s">
+          <div class="sum-label">Pending Returns</div>
+          <div class="sum-val red" id="s-pending">PKR 0</div>
+          <div class="sum-sub">capital not yet returned</div>
+        </div>
+      </div>
+
+      <!-- filter bar -->
+      <div class="filter-bar">
+        <span class="filter-label">Filter</span>
+        <div class="search-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="search-input" placeholder="Search investment or partner..." oninput="renderLedger()"/>
+        </div>
+        <select class="filter-select" id="cat-filter" onchange="renderLedger()">
+          <option value="">All Categories</option>
+          <option value="real-estate">Real Estate</option>
+          <option value="stocks">Stocks</option>
+          <option value="business">Business</option>
+          <option value="commodities">Commodities</option>
+          <option value="other">Other</option>
+        </select>
+        <select class="filter-select" id="sort-filter" onchange="renderLedger()">
+          <option value="date-desc">Newest First</option>
+          <option value="date-asc">Oldest First</option>
+          <option value="total-desc">Highest Capital</option>
+          <option value="total-asc">Lowest Capital</option>
+        </select>
+        <button class="filter-chip active" id="chip-all" onclick="setStatusFilter('all',this)">All</button>
+        <button class="filter-chip" id="chip-settled" onclick="setStatusFilter('settled',this)">Settled</button>
+        <button class="filter-chip" id="chip-pending" onclick="setStatusFilter('pending',this)">Pending</button>
+      </div>
+
+      <!-- main split -->
+      <div class="ledger-split">
+
+        <!-- ledger table -->
+        <div class="ledger-section">
+          <div class="section-head">
+            <div class="section-title">Investment Records</div>
+            <div class="record-count" id="record-count">0 records</div>
+          </div>
+          <div class="table-wrap">
+            <table class="ledger-table">
+              <thead>
+                <tr>
+                  <th style="width:32px"></th>
+                  <th>Investment</th>
+                  <th>Date</th>
+                  <th>Partners</th>
+                  <th class="right">Capital In</th>
+                  <th class="right">Returned</th>
+                  <th class="right">P&L</th>
+                  <th class="center">Status</th>
+                </tr>
+              </thead>
+              <tbody id="ledger-tbody">
+              </tbody>
+            </table>
+            <div id="table-empty" style="display:none">
+              <div class="table-empty">
+                <div class="table-empty-icon">◈</div>
+                <div class="table-empty-title">No records found</div>
+                <div class="table-empty-sub">Try adjusting your filters,<br>or add investments from the dashboard.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- right sidebar -->
+        <div class="partner-sidebar">
+
+          <!-- partner leaderboard -->
+          <div class="ps-card">
+            <div class="ps-card-title">Top Partners by Capital</div>
+            <div class="partner-lb" id="partner-lb"></div>
+          </div>
+
+          <!-- category breakdown -->
+          <div class="ps-card">
+            <div class="ps-card-title">Capital by Category</div>
+            <div class="cat-list" id="cat-breakdown"></div>
+          </div>
+
+          <!-- recent activity timeline -->
+          <div class="ps-card">
+            <div class="ps-card-title">Recent Activity</div>
+            <div class="timeline" id="activity-timeline"></div>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<script>
+  // ── STATE ──
+  let investments = [];
+  let statusFilter = 'all';
+  let expandedRows = new Set();
+
+  const CAT_LABELS = { 'real-estate':'Real Estate', 'stocks':'Stocks', 'business':'Business', 'commodities':'Commodities', 'other':'Other' };
+  const CAT_ICONS  = { 'real-estate':'RE', 'stocks':'ST', 'business':'BZ', 'commodities':'CM', 'other':'OT' };
+
+  const AVATAR_COLORS = [
+    { bg:'#1a4020', text:'#a8d5ad' },
+    { bg:'#1a2540', text:'#a8c5e8' },
+    { bg:'#401a1a', text:'#e8a8a8' },
+    { bg:'#2a1a40', text:'#c8a8e8' },
+    { bg:'#401a30', text:'#e8a8d0' },
+    { bg:'#2a3010', text:'#c8d890' },
+  ];
+
+  // ── INIT ──
+  document.addEventListener('DOMContentLoaded', () => {
+    loadData();
+    renderSummary();
+    renderLedger();
+    renderSidebar();
+  });
+
+  function loadData() {
+    try {
+      const inv = localStorage.getItem('verdant_investments');
+      if (inv) investments = JSON.parse(inv);
+    } catch(e) {}
+  }
+
+  // ── STATUS FILTER ──
+  function setStatusFilter(val, el) {
+    statusFilter = val;
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    renderLedger();
+  }
+
+  // ── SUMMARY ──
+  function renderSummary() {
+    const totalCap = investments.reduce((a,b) => a+(b.total||0), 0);
+    const totalRet = investments.reduce((a,b) => a+(b.received||0), 0);
+    const pnl = totalRet - totalCap;
+    const settled = investments.filter(i => i.received > 0).length;
+    const pending = investments.filter(i => !i.received || i.received === 0).reduce((a,b) => a+(b.total||0), 0);
+
+    document.getElementById('s-capital').textContent  = fmtPKR(totalCap);
+    document.getElementById('s-returns').textContent  = fmtPKR(totalRet);
+    const pnlEl = document.getElementById('s-pnl');
+    pnlEl.textContent = (pnl >= 0 ? '+' : '') + fmtPKR(Math.abs(pnl));
+    pnlEl.className = 'sum-val ' + (pnl >= 0 ? 'green' : 'red');
+    document.getElementById('s-settled').textContent  = `${settled} / ${investments.length}`;
+    document.getElementById('s-pending').textContent  = fmtPKR(pending);
+  }
+
+  // ── RENDER LEDGER TABLE ──
+  function renderLedger() {
+    const search   = document.getElementById('search-input').value.toLowerCase();
+    const catF     = document.getElementById('cat-filter').value;
+    const sortF    = document.getElementById('sort-filter').value;
+    const tbody    = document.getElementById('ledger-tbody');
+    const emptyEl  = document.getElementById('table-empty');
+    const countEl  = document.getElementById('record-count');
+
+    // filter
+    let list = investments.filter(inv => {
+      const matchSearch = inv.name.toLowerCase().includes(search) ||
+        inv.partners.some(p => p.name.toLowerCase().includes(search));
+      const matchCat    = !catF || inv.cat === catF;
+      const matchStatus = statusFilter === 'all'
+        ? true
+        : statusFilter === 'settled'
+          ? (inv.received > 0)
+          : (!inv.received || inv.received === 0);
+      return matchSearch && matchCat && matchStatus;
+    });
+
+    // sort
+    list = list.slice().sort((a,b) => {
+      if (sortF === 'date-desc') return new Date(b.date||b.createdAt) - new Date(a.date||a.createdAt);
+      if (sortF === 'date-asc')  return new Date(a.date||a.createdAt) - new Date(b.date||b.createdAt);
+      if (sortF === 'total-desc') return (b.total||0) - (a.total||0);
+      if (sortF === 'total-asc')  return (a.total||0) - (b.total||0);
+      return 0;
+    });
+
+    countEl.textContent = list.length + (list.length === 1 ? ' record' : ' records');
+
+    if (list.length === 0) {
+      tbody.innerHTML = '';
+      emptyEl.style.display = 'block';
+      return;
+    }
+    emptyEl.style.display = 'none';
+
+    tbody.innerHTML = '';
+
+    list.forEach(inv => {
+      const pnl    = (inv.received||0) - inv.total;
+      const status = inv.received > 0
+        ? (inv.received >= inv.total ? 'settled' : 'partial')
+        : 'pending';
+      const statusLabel = { settled:'Settled', pending:'Pending', partial:'Partial' }[status];
+      const isExpanded  = expandedRows.has(inv.id);
+      const catIcon     = CAT_ICONS[inv.cat] || 'OT';
+      const catLabel    = CAT_LABELS[inv.cat] || 'Other';
+
+      // main row
+      const tr = document.createElement('tr');
+      tr.className = isExpanded ? 'expanded-parent' : '';
+      tr.onclick = () => toggleRow(inv.id, tr);
+      tr.innerHTML = `
+        <td>
+          <button class="expand-btn ${isExpanded ? 'open' : ''}" id="expbtn-${inv.id}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </td>
+        <td>
+          <div class="td-inv">
+            <div class="td-inv-icon">${catIcon}</div>
+            <div>
+              <div class="td-inv-name">${inv.name}</div>
+              <div class="td-inv-cat">${catLabel}</div>
+            </div>
+          </div>
+        </td>
+        <td style="color:var(--muted);font-size:0.64rem">${formatDate(inv.date)}</td>
+        <td style="color:var(--muted);font-size:0.64rem">${inv.partners.length} partner${inv.partners.length!==1?'s':''}</td>
+        <td class="right"><div class="td-amount">${fmtPKR(inv.total)}</div></td>
+        <td class="right"><div class="td-amount ${inv.received>0?'green':'dim'}">${inv.received>0?fmtPKR(inv.received):'—'}</div></td>
+        <td class="right"><div class="td-amount ${pnl>=0?'green':'dim'}" style="${pnl<0?'color:#e08080':''}">${inv.received>0?(pnl>=0?'+':'')+fmtPKR(Math.abs(pnl)):'—'}</div></td>
+        <td class="center"><span class="badge ${status}">${statusLabel}</span></td>
+      `;
+      tbody.appendChild(tr);
+
+      // breakdown row (partner detail)
+      const btr = document.createElement('tr');
+      btr.className = 'breakdown-row' + (isExpanded ? ' show' : '');
+      btr.id = 'breakdown-' + inv.id;
+
+      const bRows = inv.partners.map(p => {
+        const pInvested = (p.pct/100)*inv.total;
+        const pReturned = inv.received>0 ? (p.pct/100)*inv.received : 0;
+        const pPnl      = pReturned - pInvested;
+        const initials  = p.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+        const ac        = AVATAR_COLORS[Math.abs(hashStr(p.name)) % AVATAR_COLORS.length];
+        return `<tr>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="width:22px;height:22px;border-radius:50%;background:${ac.bg};color:${ac.text};display:flex;align-items:center;justify-content:center;font-size:0.52rem;flex-shrink:0;border:1px solid rgba(255,255,255,.06)">${initials}</div>
+              ${p.name}
+            </div>
+          </td>
+          <td class="right bd-pct">${p.pct}%</td>
+          <td class="right">${fmtPKR(pInvested)}</td>
+          <td class="right ${pReturned>0?'bd-ret':'bd-nil'}">${pReturned>0?fmtPKR(pReturned):'—'}</td>
+          <td class="right ${pPnl>=0?'bd-ret':'bd-nil'}" style="${pPnl<0?'color:#e08080':''}">${pReturned>0?(pPnl>=0?'+':'')+fmtPKR(Math.abs(pPnl)):'—'}</td>
+        </tr>`;
+      }).join('');
+
+      btr.innerHTML = `
+        <td colspan="8">
+          <div class="breakdown-inner">
+            <table class="breakdown-table">
+              <thead>
+                <tr>
+                  <th>Partner</th>
+                  <th class="right">Share</th>
+                  <th class="right">Invested</th>
+                  <th class="right">Returned</th>
+                  <th class="right">P&L</th>
+                </tr>
+              </thead>
+              <tbody>${bRows}</tbody>
+            </table>
+          </div>
+        </td>`;
+      tbody.appendChild(btr);
+    });
+  }
+
+  function toggleRow(id, tr) {
+    if (expandedRows.has(id)) {
+      expandedRows.delete(id);
+    } else {
+      expandedRows.add(id);
+    }
+    // re-render to update state cleanly
+    renderLedger();
+  }
+
+  // ── RIGHT SIDEBAR ──
+  function renderSidebar() {
+    renderPartnerLeaderboard();
+    renderCategoryBreakdown();
+    renderTimeline();
+  }
+
+  function renderPartnerLeaderboard() {
+    const lb = document.getElementById('partner-lb');
+    const partnerMap = {};
+    investments.forEach(inv => {
+      inv.partners.forEach(p => {
+        const key = p.name.toLowerCase();
+        if (!partnerMap[key]) partnerMap[key] = { name:p.name, invested:0, deals:0 };
+        partnerMap[key].invested += (p.pct/100)*inv.total;
+        partnerMap[key].deals++;
+      });
+    });
+
+    const sorted = Object.values(partnerMap).sort((a,b) => b.invested-a.invested).slice(0,6);
+
+    if (sorted.length === 0) {
+      lb.innerHTML = '<div style="font-size:.62rem;color:var(--muted);padding:8px 0">No partner data yet.</div>';
+      return;
+    }
+
+    lb.innerHTML = sorted.map((p, i) => {
+      const ac = AVATAR_COLORS[Math.abs(hashStr(p.name)) % AVATAR_COLORS.length];
+      const initials = p.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+      return `<div class="lb-row">
+        <div class="lb-rank">${i+1}</div>
+        <div class="lb-avatar" style="background:${ac.bg};color:${ac.text}">${initials}</div>
+        <div class="lb-info">
+          <div class="lb-name">${p.name}</div>
+          <div class="lb-deals">${p.deals} deal${p.deals!==1?'s':''}</div>
+        </div>
+        <div class="lb-amt">${fmtPKR(p.invested)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function renderCategoryBreakdown() {
+    const el = document.getElementById('cat-breakdown');
+    const catMap = {};
+    let grandTotal = 0;
+    investments.forEach(inv => {
+      const c = inv.cat || 'other';
+      catMap[c] = (catMap[c]||0) + (inv.total||0);
+      grandTotal += (inv.total||0);
+    });
+
+    if (grandTotal === 0) {
+      el.innerHTML = '<div style="font-size:.62rem;color:var(--muted)">No data yet.</div>';
+      return;
+    }
+
+    const sorted = Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
+    el.innerHTML = sorted.map(([cat, amt]) => {
+      const pct = grandTotal > 0 ? ((amt/grandTotal)*100).toFixed(1) : 0;
+      return `<div class="cat-row">
+        <div class="cat-head">
+          <div class="cat-name">${CAT_LABELS[cat]||cat}</div>
+          <div class="cat-pct-label">${pct}%</div>
+        </div>
+        <div class="cat-bar"><div class="cat-fill" style="width:${pct}%"></div></div>
+        <div class="cat-sub">${fmtPKR(amt)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function renderTimeline() {
+    const el = document.getElementById('activity-timeline');
+    // build events: each investment creation + each return received
+    const events = [];
+    investments.forEach(inv => {
+      events.push({ date: inv.date||inv.createdAt, label: inv.name, type:'invest', amt:inv.total });
+      if (inv.received > 0) events.push({ date: inv.date||inv.createdAt, label: inv.name, type:'return', amt:inv.received });
+    });
+
+    events.sort((a,b) => new Date(b.date)-new Date(a.date));
+    const top = events.slice(0,6);
+
+    if (top.length === 0) {
+      el.innerHTML = '<div style="font-size:.62rem;color:var(--muted)">No activity yet.</div>';
+      return;
+    }
+
+    el.innerHTML = top.map(ev => `
+      <div class="tl-item">
+        <div class="tl-dot ${ev.type==='return'?'filled':''}"></div>
+        <div class="tl-body">
+          <div class="tl-name">${ev.label}</div>
+          <div class="tl-date">${ev.type==='return'?'Return received':'Invested'} · ${formatDate(ev.date)}</div>
+          <div class="tl-amt">${ev.type==='return'?'+':'−'} ${fmtPKR(ev.amt)}</div>
+        </div>
+      </div>`).join('');
+  }
+
+  // ── EXPORT CSV ──
+  function exportCSV() {
+    const rows = [['Investment','Category','Date','Total Capital','Returned','P&L','Status','Partner','Share %','Partner Capital','Partner Return']];
+    investments.forEach(inv => {
+      const pnl = (inv.received||0)-inv.total;
+      const status = inv.received>0?(inv.received>=inv.total?'Settled':'Partial'):'Pending';
+      inv.partners.forEach((p,i) => {
+        const pCap = (p.pct/100)*inv.total;
+        const pRet = inv.received>0?(p.pct/100)*inv.received:0;
+        rows.push([
+          i===0?inv.name:'',
+          i===0?CAT_LABELS[inv.cat]||inv.cat:'',
+          i===0?inv.date:'',
+          i===0?inv.total:'',
+          i===0?(inv.received||0):'',
+          i===0?pnl:'',
+          i===0?status:'',
+          p.name, p.pct+'%',
+          pCap.toFixed(2),
+          pRet.toFixed(2)
+        ]);
+      });
+    });
+
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'verdant_ledger_' + new Date().toISOString().split('T')[0] + '.csv';
+    a.click();
+  }
+
+  // ── HELPERS ──
+  function fmtPKR(n) {
+    if (!n && n!==0) return '—';
+    if (n >= 1_000_000) return 'PKR '+(n/1_000_000).toFixed(2)+'M';
+    if (n >= 1_000) return 'PKR '+(n/1_000).toFixed(1)+'K';
+    return 'PKR '+n.toLocaleString();
+  }
+
+  function formatDate(d) {
+    if (!d) return '—';
+    const dt = new Date((d.includes('T')?d:d+'T00:00:00'));
+    return dt.toLocaleDateString('en-PK',{day:'numeric',month:'short',year:'numeric'});
+  }
+
+  function hashStr(s) {
+    let h=0;
+    for (let i=0;i<s.length;i++) h=(Math.imul(31,h)+s.charCodeAt(i))|0;
+    return h;
+  }
+</script>
+</body>
+</html>
